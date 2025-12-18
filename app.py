@@ -5,78 +5,93 @@ import folium
 from streamlit_folium import st_folium
 from scipy.spatial import cKDTree
 
-# Configuración de página
-st.set_page_config(page_title="Mapa de Cobertura Argentina", layout="wide")
+# Configuración de la página
+st.set_page_config(page_title="Mapa de Cobertura Salud", layout="wide")
 
-# --- FUNCIÓN PARA FORMATO ARGENTINO (1.234,56) ---
+# --- 1. FUNCIÓN PARA FORMATO ARGENTINO (1.234,56) ---
 def formato_es(valor):
     if pd.isna(valor) or valor == 0:
         return "0,00"
-    # Formatea con punto en miles y coma en decimales
     return f"{valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
+# --- 2. PROCESAMIENTO DE DATOS ---
 @st.cache_data
 def cargar_y_procesar_datos():
-    # Cargar archivos
-    # IMPORTANTE: Asegúrate de que los nombres coincidan exactamente con tus archivos en GitHub
+    # Cargar archivos (Asegúrate que los nombres en GitHub sean idénticos a estos)
     df_afi = pd.read_csv('Afiliados interior geolocalizacion.csv')
     df_cons = pd.read_csv('Consultorios GeoLocalizacion (1).csv')
 
-    # --- LIMPIEZA Y FILTRO GEOGRÁFICO (Para evitar errores de distancia) ---
+    # A. Eliminar duplicados como en Power Query
+    df_afi = df_afi.drop_duplicates(subset=['AFI_ID', 'CALLE', 'NUMERO'])
+
+    # B. Guardar el total de la base (para comparar con Power BI)
+    total_unicos_base = df_afi['AFI_ID'].nunique()
+
+    # C. Limpieza y Filtro Geográfico de Argentina
     LAT_MIN, LAT_MAX = -56.0, -21.0
     LON_MIN, LON_MAX = -74.0, -53.0
 
-    def limpiar_coords(df):
+    def filtrar_geo(df):
         df['LATITUD'] = pd.to_numeric(df['LATITUD'], errors='coerce')
         df['LONGITUD'] = pd.to_numeric(df['LONGITUD'], errors='coerce')
         mask = (df['LATITUD'].between(LAT_MIN, LAT_MAX)) & (df['LONGITUD'].between(LON_MIN, LON_MAX))
         return df[mask].copy()
 
-    df_afi = limpiar_coords(df_afi)
-    df_cons = limpiar_coords(df_cons)
+    df_mapa_afi = filtrar_geo(df_afi)
+    df_mapa_cons = filtrar_geo(df_cons)
 
-    # --- CÁLCULO DE DISTANCIAS AL CONSULTORIO MÁS CERCANO ---
-    tree = cKDTree(df_cons[['LATITUD', 'LONGITUD']].values)
-    dist, _ = tree.query(df_afi[['LATITUD', 'LONGITUD']].values, k=1)
-    df_afi['distancia_km'] = dist * 111.13 
+    # D. Cálculo de Distancia al consultorio más cercano
+    # Creamos el árbol con los consultorios válidos
+    tree = cKDTree(df_mapa_cons[['LATITUD', 'LONGITUD']].values)
+    dist, _ = tree.query(df_mapa_afi[['LATITUD', 'LONGITUD']].values, k=1)
+    df_mapa_afi['distancia_km'] = dist * 111.13 
 
-    # --- MÉTRICAS POR LOCALIDAD ---
-    resumen_afi = df_afi.groupby(['LOCALIDAD', 'PROVINCIA']).agg(
-        cant_afiliados=('AFI_ID', 'count'),
+    # E. Agrupación por Localidad para el Mapa
+    resumen_afi = df_mapa_afi.groupby(['LOCALIDAD', 'PROVINCIA']).agg(
+        cant_afiliados=('AFI_ID', 'nunique'), # Distinct Count
         dist_media=('distancia_km', 'mean'),
         lat_ref=('LATITUD', 'mean'), 
         lon_ref=('LONGITUD', 'mean')
     ).reset_index()
 
-    resumen_cons = df_cons.groupby(['LOCALIDAD', 'PROVINCIA']).size().reset_index(name='cant_consultorios')
+    resumen_cons = df_mapa_cons.groupby(['LOCALIDAD', 'PROVINCIA']).size().reset_index(name='cant_consultorios')
     
     data_final = pd.merge(resumen_afi, resumen_cons, on=['LOCALIDAD', 'PROVINCIA'], how='left').fillna(0)
-    
-    # Afiliados por Consultorio (evitando división por cero)
     data_final['afi_por_cons'] = data_final['cant_afiliados'] / data_final['cant_consultorios'].replace(0, np.nan)
     
-    return data_final
+    return data_final, total_unicos_base
 
-# --- INTERFAZ DE LA APP ---
-st.title("📍 Mapa de Gestión de Salud - Argentina")
+# --- 3. INTERFAZ DE USUARIO ---
+st.title("📍 Mapa Interactivo de Afiliados y Consultorios")
 
 try:
-    # Llamada a la función (CORREGIDA)
-    data = cargar_y_procesar_datos()
+    # Obtener datos procesados
+    data, total_base = cargar_y_procesar_datos()
 
-    # Sidebar con métricas formateadas
-    st.sidebar.header("Resumen General")
-    total_afi = int(data['cant_afiliados'].sum())
-    dist_prom_gral = data['dist_media'].mean()
+    # --- SIDEBAR (PANEL LATERAL) ---
+    st.sidebar.header("📊 Resumen de Datos")
     
-    st.sidebar.metric("Total Afiliados", f"{total_afi:,}".replace(",", "."))
+    # Total igual a Power BI
+    st.sidebar.metric("Total Afiliados Únicos", f"{total_base:,}".replace(",", "."))
+    
+    # Total que se puede mostrar en el mapa
+    afi_en_mapa = int(data['cant_afiliados'].sum())
+    st.sidebar.metric("Afiliados Geolocalizados", f"{afi_en_mapa:,}".replace(",", "."))
+    
+    # Alerta si hay mucha diferencia
+    diferencia = total_base - afi_en_mapa
+    if diferencia > 0:
+        st.sidebar.warning(f"Hay {diferencia:,}".replace(",", ".") + " registros sin coordenadas válidas.")
+
+    # Métrica de Distancia
+    dist_prom_gral = data['dist_media'].mean()
     st.sidebar.metric("Distancia Promedio", f"{formato_es(dist_prom_gral)} km")
 
-    # Creación del Mapa
+    # --- MAPA ---
     m = folium.Map(location=[-38.4161, -63.6167], zoom_start=4, tiles="cartodbpositron")
 
     for _, row in data.iterrows():
-        # Formatear valores para el Tooltip
+        # Formatear textos para el Tooltip
         afiliados_str = f"{int(row['cant_afiliados']):,}".replace(",", ".")
         cons_str = str(int(row['cant_consultorios']))
         dist_str = formato_es(row['dist_media'])
@@ -94,22 +109,19 @@ try:
             </div>
         """
         
-        # Color: Rojo si no hay consultorios (alerta), Azul si hay
-        color_ponto = "#d62728" if row['cant_consultorios'] == 0 else "#1f77b4"
+        # Color: Rojo si hay 0 consultorios, Azul si hay al menos 1
+        color_marker = "#d62728" if row['cant_consultorios'] == 0 else "#1f77b4"
         
         folium.CircleMarker(
             location=[row['lat_ref'], row['lon_ref']],
             radius=min(25, 5 + (row['cant_afiliados'] / 100)),
             tooltip=folium.Tooltip(tooltip_info),
-            color=color_ponto,
+            color=color_marker,
             fill=True,
             fill_opacity=0.6
         ).add_to(m)
 
-    # Renderizar mapa
     st_folium(m, width="100%", height=600)
 
 except Exception as e:
-    st.error(f"Error al cargar la aplicación: {e}")
-    st.info("Verifica que los nombres de las columnas LATITUD y LONGITUD estén en mayúsculas en tus CSV.")
-
+    st.error(f"Se produjo un error: {e}")
