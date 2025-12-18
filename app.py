@@ -87,7 +87,7 @@ try:
     
     # Sección Afiliados
     st.sidebar.subheader("Afiliados")
-    st.sidebar.write(f"**Total (Deduplicados):** {formato_miles(m['afi_total'])}")
+    st.sidebar.write(f"**Total Base:** {formato_miles(m['afi_total'])}")
     st.sidebar.write(f"**En Mapa:** {formato_miles(m['afi_geo'])}")
     st.sidebar.info(f"**Éxito Geo:** {formato_porcentaje(m['afi_geo'], m['afi_total'])}")
     
@@ -135,3 +135,4 @@ try:
 
 except Exception as e:
     st.error(f"Error en la aplicación: {e}")
+
