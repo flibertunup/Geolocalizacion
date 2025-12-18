@@ -1,9 +1,3 @@
-Ese error confirma exactamente lo que sospechábamos: había una pequeña falta de ortografía en el nombre de la función (escribí processed con "ed" en una línea y procesar en otra). En programación, una sola letra de diferencia hace que el sistema no encuentre la instrucción.
-
-Aquí tienes el código corregido, verificado y completo. Para solucionarlo, ve a GitHub, edita tu archivo app.py, borra todo lo que tiene y pega este bloque exacto:
-
-Python
-
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -118,3 +112,4 @@ try:
 except Exception as e:
     st.error(f"Error al cargar la aplicación: {e}")
     st.info("Verifica que los nombres de las columnas LATITUD y LONGITUD estén en mayúsculas en tus CSV.")
+
