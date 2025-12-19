@@ -147,7 +147,7 @@ with st.expander("❓ ¿Cómo usar este tablero y qué significan las métricas?
     ### 📊 Glosario de Métricas
     * **Éxito Geo:** Porcentaje de registros que tenían coordenadas válidas dentro de Argentina y pudieron ser mapeados.
     * **Distancia Media:** Es el promedio de kilómetros que deben recorrer los afiliados de esa localidad para llegar al consultorio más cercano.
-    * **Afiliados/Cons.:** Indica cuántos afiliados "le corresponden" a cada consultorio en esa localidad. Un número muy alto puede indicar saturación.
+    * **Afiliados/Cons.:** Indica cuántos afiliados "le corresponden" a cada consultorio en esa localidad.
     * **Puntos Rojos en Mapa:** Localidades que tienen afiliados pero **0 consultorios** registrados.
     """)
 
@@ -374,6 +374,7 @@ try:
 except Exception as e:
 
     st.error(f"Error en la aplicación: {e}")
+
 
 
 
