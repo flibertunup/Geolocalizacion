@@ -267,7 +267,7 @@ try:
                     <p style="font-size:12px; color:gray; margin-top:0;">{row['PROVINCIA']}</p>
                     <hr style="margin:5px 0;">
                     <b>Afiliados:</b> {formato_miles(row['cant_afiliados'])}<br>
-                    <b>Consultorios:</b> {int(row['cant_consultorios'])}<br>
+                    <b>Consultorios:</b> {formato_miles(row['cant_consultorios'])}<br>
                     <b>Afiliados/Cons.:</b> {formato_es(afi_cons_ratio)}<br>
                     <b>Dist. Media:</b> {formato_es(row['dist_media'])} km
                 </div>
@@ -326,7 +326,7 @@ try:
 
             'Afiliados': lambda x: f"{x:,}".replace(",", "."),
 
-            'Consultorios': lambda x: f"{int(x)}"
+            'Consultorios': lambda x: f"{int(x):,}".replace(",", ".")
 
         }), 
 
@@ -357,3 +357,4 @@ try:
 except Exception as e:
 
     st.error(f"Error en la aplicación: {e}")
+
