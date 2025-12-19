@@ -25,6 +25,7 @@ def formato_miles(valor):
 # --- 2. PROCESAMIENTO DE DATOS ---
 @st.cache_data
 def cargar_y_procesar_datos():
+    # Carga de archivos
     df_afi_raw = pd.read_csv('Afiliados interior geolocalizacion.csv')
     df_cons_raw = pd.read_csv('Consultorios GeoLocalizacion (1).csv')
 
@@ -71,19 +72,15 @@ try:
     # --- SIDEBAR: FILTROS ---
     st.sidebar.header("🔍 Filtros de Visualización")
     
-    # Filtro 1: Provincia
     list_prov = ["Todas"] + sorted(afi_base['PROVINCIA'].unique().tolist())
     prov_sel = st.sidebar.selectbox("Seleccionar Provincia", list_prov)
 
-    # Filtro 2: Tipo de Mapa
     tipo_mapa = st.sidebar.radio("Tipo de Vista", ["Marcadores (Localidades)", "Heatmap (Demanda Insatisfecha)"])
 
-    # Filtro 3: Slider de Distancia
     max_dist_data = float(data_mapa_raw['dist_media'].max())
     dist_range = st.sidebar.slider("Rango de Distancia Promedio (Km)", 0.0, max_dist_data, (0.0, max_dist_data))
 
     # APLICAR FILTROS A LOS DATOS
-    # Filtro de Provincia
     if prov_sel != "Todas":
         data_filtrada = data_mapa_raw[data_mapa_raw['PROVINCIA'] == prov_sel]
         afi_total_stats = len(afi_base[afi_base['PROVINCIA'] == prov_sel])
@@ -97,22 +94,33 @@ try:
         cons_total_stats = len(cons_base)
         cons_geo_stats = len(cons_geo_all)
 
-    # Filtro de Distancia (afecta a tabla y mapa)
+    # Filtro de Distancia
     data_filtrada = data_filtrada[data_filtrada['dist_media'].between(dist_range[0], dist_range[1])]
 
     # --- SIDEBAR: MÉTRICAS RECALCULADAS ---
     st.sidebar.markdown("---")
-    st.sidebar.subheader(f"📊 Salud de Datos: {prov_sel}")
+    st.sidebar.subheader(f"📊 Estadísticas: {prov_sel}")
     
-    col1, col2 = st.sidebar.columns(2)
-    with col1:
-        st.write("**Afiliados**")
-        st.write(f"Base: {formato_miles(afi_total_stats)}")
-        st.info(f"Geo: {formato_porcentaje(afi_geo_stats, afi_total_stats)}")
-    with col2:
-        st.write("**Consultorios**")
-        st.write(f"Base: {formato_miles(cons_total_stats)}")
-        st.success(f"Geo: {formato_porcentaje(cons_geo_stats, cons_total_stats)}")
+    # Métricas de Afiliados
+    st.sidebar.write("**Afiliados**")
+    st.sidebar.write(f"Total Base: {formato_miles(afi_total_stats)}")
+    st.sidebar.write(f"En Mapa: {formato_miles(afi_geo_stats)}")
+    st.sidebar.info(f"Éxito Geo: {formato_porcentaje(afi_geo_stats, afi_total_stats)}")
+    
+    st.sidebar.markdown("---")
+    
+    # Métricas de Consultorios
+    st.sidebar.write("**Consultorios**")
+    st.sidebar.write(f"Total Base: {formato_miles(cons_total_stats)}")
+    st.sidebar.write(f"En Mapa: {formato_miles(cons_geo_stats)}")
+    st.sidebar.success(f"Éxito Geo: {formato_porcentaje(cons_geo_stats, cons_total_stats)}")
+
+    st.sidebar.markdown("---")
+    
+    # Métrica de Distancia Promedio (basada en el filtro aplicado)
+    if not data_filtrada.empty:
+        dist_prom_filtrada = data_filtrada['dist_media'].mean()
+        st.sidebar.metric("Distancia Promedio", f"{formato_es(dist_prom_filtrada)} km")
 
     # --- MAPA CON ZOOM DINÁMICO ---
     if not data_filtrada.empty:
@@ -141,8 +149,6 @@ try:
                 color=color, fill=True, fill_opacity=0.6
             ).add_to(m)
     else:
-        # HEATMAP: Peso basado en afiliados con DISTANCIA (Demanda)
-        # Solo mostramos puntos con distancia > 0 o donde hay muchos afiliados
         heat_data = [[row['lat_ref'], row['lon_ref'], row['cant_afiliados']] for _, row in data_filtrada.iterrows()]
         HeatMap(heat_data, radius=15, blur=10).add_to(m)
 
@@ -152,11 +158,23 @@ try:
     st.markdown("---")
     st.subheader(f"📋 Detalle de Localidades ({prov_sel})")
     
+    # Preparación de la tabla asegurando tipos de datos
     tabla_display = data_filtrada[['LOCALIDAD', 'PROVINCIA', 'cant_afiliados', 'dist_media', 'cant_consultorios']].copy()
+    
+    # Convertir consultorios a entero para evitar el .0
+    tabla_display['cant_consultorios'] = tabla_display['cant_consultorios'].astype(int)
+    
     tabla_display.columns = ['Localidad', 'Provincia', 'Afiliados', 'Dist. Media (Km)', 'Consultorios']
     
-    # Mostrar tabla con formato
-    st.dataframe(tabla_display.style.format({'Dist. Media (Km)': '{:.2f}'}), use_container_width=True)
+    # Formateo de la tabla: Distancia con 2 decimales y Consultorios como entero (sin formato de miles con coma)
+    st.dataframe(
+        tabla_display.style.format({
+            'Dist. Media (Km)': '{:.2f}',
+            'Afiliados': lambda x: f"{x:,}".replace(",", "."),
+            'Consultorios': lambda x: f"{int(x)}"
+        }), 
+        use_container_width=True
+    )
 
     # Botón de Descarga
     csv = tabla_display.to_csv(index=False).encode('utf-8-sig')
