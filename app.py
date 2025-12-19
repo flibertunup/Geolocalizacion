@@ -19,6 +19,7 @@ def formato_porcentaje(parte, total):
     return f"{(parte / total) * 100:.1f}".replace(".", ",") + " %"
 
 def formato_miles(valor):
+    if pd.isna(valor): return "0"
     return f"{int(valor):,}".replace(",", ".")
 
 # --- 2. PROCESAMIENTO DE DATOS ---
@@ -55,7 +56,7 @@ def cargar_y_procesar_datos():
     resumen_cons = df_mapa_cons.groupby(['LOCALIDAD', 'PROVINCIA']).size().reset_index(name='cant_consultorios')
     data_final = pd.merge(resumen_afi, resumen_cons, on=['LOCALIDAD', 'PROVINCIA'], how='left').fillna(0)
     
-    # Calculamos la métrica. Si es 0 consultorios, resultará en inf o NaN
+    # Pre-calculamos la métrica. El reemplazo por "-" se hace en la visualización
     data_final['afi_por_cons'] = data_final['cant_afiliados'] / data_final['cant_consultorios'].replace(0, np.nan)
     
     return data_final, df_afi_clean, df_cons_raw, df_mapa_afi, df_mapa_cons
@@ -63,60 +64,76 @@ def cargar_y_procesar_datos():
 try:
     data_mapa_raw, afi_base, cons_base, afi_geo_all, cons_geo_all = cargar_y_procesar_datos()
 
-    # --- SIDEBAR: FILTROS ---
+    # --- 3. SIDEBAR: FILTROS ---
     st.sidebar.header("🔍 Filtros de Visualización")
+    
     list_prov = ["Todas"] + sorted(afi_base['PROVINCIA'].unique().tolist())
     prov_sel = st.sidebar.selectbox("Seleccionar Provincia", list_prov)
+
+    if prov_sel != "Todas":
+        list_loc = ["Todas"] + sorted(data_mapa_raw[data_mapa_raw['PROVINCIA'] == prov_sel]['LOCALIDAD'].unique().tolist())
+    else:
+        list_loc = ["Todas"] + sorted(data_mapa_raw['LOCALIDAD'].unique().tolist())
+    loc_sel = st.sidebar.selectbox("Seleccionar Localidad", list_loc)
 
     tipo_mapa = st.sidebar.radio("Tipo de Vista", ["Marcadores (Localidades)", "Heatmap (Distribución de Afiliados)"])
     max_dist_data = float(data_mapa_raw['dist_media'].max())
     dist_range = st.sidebar.slider("Rango de Distancia Promedio (Km)", 0.0, max_dist_data, (0.0, max_dist_data))
 
-    if prov_sel != "Todas":
-        data_filtrada = data_mapa_raw[data_mapa_raw['PROVINCIA'] == prov_sel]
-        afi_total_stats = len(afi_base[afi_base['PROVINCIA'] == prov_sel])
-        afi_geo_stats = len(afi_geo_all[afi_geo_all['PROVINCIA'] == prov_sel])
-        cons_total_stats = len(cons_base[cons_base['PROVINCIA'] == prov_sel])
-        cons_geo_stats = len(cons_geo_all[cons_geo_all['PROVINCIA'] == prov_sel])
-    else:
-        data_filtrada = data_mapa_raw
-        afi_total_stats = len(afi_base)
-        afi_geo_stats = len(afi_geo_all)
-        cons_total_stats = len(cons_base)
-        cons_geo_stats = len(cons_geo_all)
+    # --- LÓGICA DE DETECCIÓN DE PROVINCIA ---
+    # Si se elige una localidad, detectamos su provincia automáticamente para las estadísticas
+    prov_display = prov_sel
+    if loc_sel != "Todas" and prov_sel == "Todas":
+        prov_display = data_mapa_raw[data_mapa_raw['LOCALIDAD'] == loc_sel]['PROVINCIA'].iloc[0]
 
+    # Filtrado dinámico solo para el MAPA y la TABLA
+    data_filtrada = data_mapa_raw.copy()
+    if prov_sel != "Todas":
+        data_filtrada = data_filtrada[data_filtrada['PROVINCIA'] == prov_sel]
+    if loc_sel != "Todas":
+        data_filtrada = data_filtrada[data_filtrada['LOCALIDAD'] == loc_sel]
     data_filtrada = data_filtrada[data_filtrada['dist_media'].between(dist_range[0], dist_range[1])]
 
-    # --- MÉTRICAS SIDEBAR ---
+    # --- 4. SIDEBAR: ESTADÍSTICAS (SIEMPRE POR PROVINCIA) ---
     st.sidebar.markdown("---")
-    st.sidebar.subheader(f"📊 Estadísticas: {prov_sel}")
+    st.sidebar.subheader(f"📊 Estadísticas: {prov_display}")
+    
+    # Estas métricas ignoran el filtro de localidad
+    df_afi_stats = afi_base if prov_display == "Todas" else afi_base[afi_base['PROVINCIA'] == prov_display]
+    df_afi_geo_stats = afi_geo_all if prov_display == "Todas" else afi_geo_all[afi_geo_all['PROVINCIA'] == prov_display]
+    df_cons_stats = cons_base if prov_display == "Todas" else cons_base[cons_base['PROVINCIA'] == prov_display]
+    df_cons_geo_stats = cons_geo_all if prov_display == "Todas" else cons_geo_all[cons_geo_all['PROVINCIA'] == prov_display]
+
     st.sidebar.write("**Afiliados**")
-    st.sidebar.write(f"Total Base: {formato_miles(afi_total_stats)}")
-    st.sidebar.write(f"En Mapa: {formato_miles(afi_geo_stats)}")
-    st.sidebar.info(f"Éxito Geo: {formato_porcentaje(afi_geo_stats, afi_total_stats)}")
+    st.sidebar.write(f"Total Base: {formato_miles(len(df_afi_stats))}")
+    st.sidebar.write(f"En Mapa: {formato_miles(len(df_afi_geo_stats))}")
+    st.sidebar.info(f"Éxito Geo: {formato_porcentaje(len(df_afi_geo_stats), len(df_afi_stats))}")
+    
     st.sidebar.markdown("---")
     st.sidebar.write("**Consultorios**")
-    st.sidebar.write(f"Total Base: {formato_miles(cons_total_stats)}")
-    st.sidebar.write(f"En Mapa: {formato_miles(cons_geo_stats)}")
-    st.sidebar.success(f"Éxito Geo: {formato_porcentaje(cons_geo_stats, cons_total_stats)}")
+    st.sidebar.write(f"Total Base: {formato_miles(len(df_cons_stats))}")
+    st.sidebar.write(f"En Mapa: {formato_miles(len(df_cons_geo_stats))}")
+    st.sidebar.success(f"Éxito Geo: {formato_porcentaje(len(df_cons_geo_stats), len(df_cons_stats))}")
+
     st.sidebar.markdown("---")
+    # Distancia Promedio calculada sobre la PROVINCIA (Ignora localidad)
+    if not df_afi_geo_stats.empty:
+        dist_prom_prov = df_afi_geo_stats['distancia_km'].mean()
+        st.sidebar.metric("Distancia Promedio", f"{formato_es(dist_prom_prov)} km")
 
-    if not data_filtrada.empty:
-        dist_prom_filtrada = data_filtrada['dist_media'].mean()
-        st.sidebar.metric("Distancia Promedio", f"{formato_es(dist_prom_filtrada)} km")
-
-    # --- MAPA ---
+    # --- 5. MAPA ---
     if not data_filtrada.empty:
         centro = [data_filtrada['lat_ref'].mean(), data_filtrada['lon_ref'].mean()]
-        zoom = 4 if prov_sel == "Todas" else 7
+        zoom = 4 if prov_sel == "Todas" and loc_sel == "Todas" else 7 if loc_sel == "Todas" else 12
     else:
         centro, zoom = [-38.4161, -63.6167], 4
 
     m = folium.Map(location=centro, zoom_start=zoom, tiles="cartodbpositron")
-
     if tipo_mapa == "Marcadores (Localidades)":
         for _, row in data_filtrada.iterrows():
-            afi_cons_ratio = row['afi_por_cons']
+            afi_cons_val = row['afi_por_cons']
+            afi_cons_txt = formato_es(afi_cons_val) if pd.notna(afi_cons_val) else "-"
+            
             tooltip_txt = f"""
                 <div style="font-family: Arial; width: 220px;">
                     <h4 style="margin-bottom:5px; color:#1f77b4;">{row['LOCALIDAD']}</h4>
@@ -124,7 +141,7 @@ try:
                     <hr style="margin:5px 0;">
                     <b>Afiliados:</b> {formato_miles(row['cant_afiliados'])}<br>
                     <b>Consultorios:</b> {formato_miles(row['cant_consultorios'])}<br>
-                    <b>Afiliados/Cons.:</b> {formato_es(afi_cons_ratio) if pd.notna(afi_cons_ratio) else "-"}<br>
+                    <b>Afiliados/Cons.:</b> {afi_cons_txt}<br>
                     <b>Dist. Media:</b> {formato_es(row['dist_media'])} km
                 </div>
             """
@@ -141,39 +158,41 @@ try:
 
     st_folium(m, width="100%", height=550, key="mapa_dinamico")
 
-    # --- 5. TABLA DE DATOS ---
+    # --- 6. TABLA DE DATOS (DETALLE) ---
     st.markdown("---")
-    st.subheader(f"📋 Detalle de Localidades ({prov_sel})")
+    st.subheader(f"📋 Detalle de Localidades ({prov_display})")
 
-    # Selección de columnas incluyendo la nueva métrica
-    tabla_display = data_filtrada[['LOCALIDAD', 'PROVINCIA', 'cant_afiliados', 'dist_media', 'cant_consultorios', 'afi_por_cons']].copy()
-    tabla_display['cant_consultorios'] = tabla_display['cant_consultorios'].astype(int)
-    tabla_display.columns = ['Localidad', 'Provincia', 'Afiliados', 'Dist. Media (Km)', 'Consultorios', 'Afiliados/Cons.']
+    if not data_filtrada.empty:
+        tabla_display = data_filtrada[['LOCALIDAD', 'PROVINCIA', 'cant_afiliados', 'dist_media', 'cant_consultorios', 'afi_por_cons']].copy()
+        tabla_display.columns = ['Localidad', 'Provincia', 'Afiliados', 'Dist. Media (Km)', 'Consultorios', 'Afiliados/Cons.']
 
-    # Visualización en Streamlit con formato de coma para decimales
-    st.dataframe(
-        tabla_display.style.format({
-            'Dist. Media (Km)': lambda x: f"{x:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."),
-            'Afiliados': lambda x: f"{x:,}".replace(",", "."),
-            'Consultorios': lambda x: f"{int(x):,}".replace(",", "."),
-            'Afiliados/Cons.': lambda x: "-" if (pd.isna(x) or np.isinf(x)) else f"{x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-        }), 
-        use_container_width=True
-    )
+        st.dataframe(
+            tabla_display.style.format({
+                'Dist. Media (Km)': lambda x: f"{x:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."),
+                'Afiliados': lambda x: f"{int(x):,}".replace(",", "."),
+                'Consultorios': lambda x: f"{int(x):,}".replace(",", "."),
+                'Afiliados/Cons.': lambda x: "-" if (pd.isna(x) or np.isinf(x)) else f"{x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+            }), 
+            use_container_width=True
+        )
 
-    # --- DESCARGA ---
-    # Para el CSV, aplicamos el formato de texto para asegurar que el "-" y las comas se mantengan
-    df_download = tabla_display.copy()
-    df_download['Dist. Media (Km)'] = df_download['Dist. Media (Km)'].apply(lambda x: f"{x:.2f}".replace(".", ","))
-    df_download['Afiliados/Cons.'] = df_download['Afiliados/Cons.'].apply(lambda x: "-" if (pd.isna(x) or np.isinf(x)) else f"{x:.2f}".replace(".", ","))
-    
-    csv = df_download.to_csv(index=False).encode('utf-8-sig')
-    st.download_button(
-        label="📥 Descargar tabla como CSV",
-        data=csv,
-        file_name=f'reporte_cobertura_{prov_sel.lower()}.csv',
-        mime='text/csv',
-    )
+        # --- PREPARACIÓN DE DESCARGA (CORRECCIÓN DE "NONE") ---
+        df_download = tabla_display.copy()
+        # Aseguramos formato texto con coma decimal y guion medio para exportación
+        df_download['Dist. Media (Km)'] = df_download['Dist. Media (Km)'].apply(lambda x: f"{x:.2f}".replace(".", ","))
+        df_download['Afiliados/Cons.'] = df_download['Afiliados/Cons.'].apply(
+            lambda x: "-" if (pd.isna(x) or np.isinf(x)) else f"{x:.2f}".replace(".", ",")
+        )
+        
+        csv = df_download.to_csv(index=False).encode('utf-8-sig')
+        st.download_button(
+            label="📥 Descargar tabla como CSV",
+            data=csv,
+            file_name=f'reporte_cobertura_{prov_display.lower()}.csv',
+            mime='text/csv',
+        )
+    else:
+        st.warning("No hay datos para los filtros seleccionados.")
 
 except Exception as e:
     st.error(f"Error en la aplicación: {e}")
