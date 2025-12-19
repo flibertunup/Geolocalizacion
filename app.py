@@ -12,6 +12,8 @@ from folium.plugins import HeatMap
 
 from scipy.spatial import cKDTree
 
+import io
+
 
 
 # Configuración de la página
@@ -50,11 +52,15 @@ def formato_miles(valor):
 
 def cargar_y_procesar_datos():
 
+    # Carga de archivos
+
     df_afi_raw = pd.read_csv('Afiliados interior geolocalizacion.csv')
 
     df_cons_raw = pd.read_csv('Consultorios GeoLocalizacion (1).csv')
 
 
+
+    # A. Deduplicación y limpieza
 
     df_afi_clean = df_afi_raw.drop_duplicates(subset=['AFI_ID', 'CALLE', 'NUMERO'])
 
@@ -84,6 +90,8 @@ def cargar_y_procesar_datos():
 
 
 
+    # B. Cálculo de Distancias
+
     tree = cKDTree(df_mapa_cons[['LATITUD', 'LONGITUD']].values)
 
     dist, _ = tree.query(df_mapa_afi[['LATITUD', 'LONGITUD']].values, k=1)
@@ -91,6 +99,8 @@ def cargar_y_procesar_datos():
     df_mapa_afi['distancia_km'] = dist * 111.13 
 
 
+
+    # C. Agrupación por Localidad (Data para el mapa)
 
     resumen_afi = df_mapa_afi.groupby(['LOCALIDAD', 'PROVINCIA']).agg(
 
@@ -110,10 +120,6 @@ def cargar_y_procesar_datos():
 
     data_final = pd.merge(resumen_afi, resumen_cons, on=['LOCALIDAD', 'PROVINCIA'], how='left').fillna(0)
 
-    
-
-    # Calculamos la métrica. Si es 0 consultorios, resultará en inf o NaN
-
     data_final['afi_por_cons'] = data_final['cant_afiliados'] / data_final['cant_consultorios'].replace(0, np.nan)
 
     
@@ -121,6 +127,29 @@ def cargar_y_procesar_datos():
     return data_final, df_afi_clean, df_cons_raw, df_mapa_afi, df_mapa_cons
 
 
+
+# --- 3. INTERFAZ Y FILTROS ---
+
+st.title("📍 Tablero de Gestión de Cobertura Sanitaria")
+
+
+# --- SECCIÓN DE AYUDA / MANUAL ---
+with st.expander("❓ ¿Cómo usar este tablero y qué significan las métricas?"):
+    st.markdown("""
+    ### 📖 Guía de Usuario
+    Este tablero permite analizar la relación geográfica entre nuestros **afiliados** y los **consultorios** disponibles.
+    
+    * **Filtros:** Utilice el panel izquierdo para segmentar por provincia o ajustar el rango de distancia. 
+    * **Tipos de Vista:** 
+        * **Marcadores:** Muestra puntos exactos. El tamaño del círculo depende de la cantidad de afiliados. 
+        * **Heatmap:** Muestra la densidad poblacional. Las zonas rojas son las de mayor concentración.
+    
+    ### 📊 Glosario de Métricas
+    * **Éxito Geo:** Porcentaje de registros que tenían coordenadas válidas dentro de Argentina y pudieron ser mapeados.
+    * **Distancia Media:** Es el promedio de kilómetros que deben recorrer los afiliados de esa localidad para llegar al consultorio más cercano.
+    * **Afiliados/Cons.:** Indica cuántos afiliados "le corresponden" a cada consultorio en esa localidad.
+    * **Puntos Rojos en Mapa:** Localidades que tienen afiliados pero **0 consultorios** registrados.
+    """)
 
 try:
 
@@ -132,6 +161,8 @@ try:
 
     st.sidebar.header("🔍 Filtros de Visualización")
 
+    
+
     list_prov = ["Todas"] + sorted(afi_base['PROVINCIA'].unique().tolist())
 
     prov_sel = st.sidebar.selectbox("Seleccionar Provincia", list_prov)
@@ -140,11 +171,15 @@ try:
 
     tipo_mapa = st.sidebar.radio("Tipo de Vista", ["Marcadores (Localidades)", "Heatmap (Distribución de Afiliados)"])
 
+
+
     max_dist_data = float(data_mapa_raw['dist_media'].max())
 
     dist_range = st.sidebar.slider("Rango de Distancia Promedio (Km)", 0.0, max_dist_data, (0.0, max_dist_data))
 
 
+
+    # APLICAR FILTROS A LOS DATOS
 
     if prov_sel != "Todas":
 
@@ -172,15 +207,21 @@ try:
 
 
 
+    # Filtro de Distancia
+
     data_filtrada = data_filtrada[data_filtrada['dist_media'].between(dist_range[0], dist_range[1])]
 
 
 
-    # --- MÉTRICAS SIDEBAR ---
+    # --- SIDEBAR: MÉTRICAS RECALCULADAS ---
 
     st.sidebar.markdown("---")
 
     st.sidebar.subheader(f"📊 Estadísticas: {prov_sel}")
+
+    
+
+    # Métricas de Afiliados
 
     st.sidebar.write("**Afiliados**")
 
@@ -190,7 +231,13 @@ try:
 
     st.sidebar.info(f"Éxito Geo: {formato_porcentaje(afi_geo_stats, afi_total_stats)}")
 
+    
+
     st.sidebar.markdown("---")
+
+    
+
+    # Métricas de Consultorios
 
     st.sidebar.write("**Consultorios**")
 
@@ -200,9 +247,13 @@ try:
 
     st.sidebar.success(f"Éxito Geo: {formato_porcentaje(cons_geo_stats, cons_total_stats)}")
 
+
+
     st.sidebar.markdown("---")
 
+    
 
+    # Métrica de Distancia Promedio (basada en el filtro aplicado)
 
     if not data_filtrada.empty:
 
@@ -212,109 +263,87 @@ try:
 
 
 
-    # --- MAPA ---
-
+# --- MAPA CON ZOOM DINÁMICO ---
     if not data_filtrada.empty:
-
         centro = [data_filtrada['lat_ref'].mean(), data_filtrada['lon_ref'].mean()]
-
         zoom = 4 if prov_sel == "Todas" else 7
-
     else:
-
         centro, zoom = [-38.4161, -63.6167], 4
-
-
 
     m = folium.Map(location=centro, zoom_start=zoom, tiles="cartodbpositron")
 
-
-
     if tipo_mapa == "Marcadores (Localidades)":
-
         for _, row in data_filtrada.iterrows():
-
-            afi_cons_ratio = row['afi_por_cons']
-
+            # Cálculo de la métrica específica para el tooltip
+            afi_cons_ratio = row['cant_afiliados'] / row['cant_consultorios'] if row['cant_consultorios'] > 0 else np.nan
+            
+            # Construcción del Tooltip con HTML y CSS para recuperar el diseño anterior
             tooltip_txt = f"""
-
                 <div style="font-family: Arial; width: 220px;">
-
                     <h4 style="margin-bottom:5px; color:#1f77b4;">{row['LOCALIDAD']}</h4>
-
                     <p style="font-size:12px; color:gray; margin-top:0;">{row['PROVINCIA']}</p>
-
                     <hr style="margin:5px 0;">
-
                     <b>Afiliados:</b> {formato_miles(row['cant_afiliados'])}<br>
-
                     <b>Consultorios:</b> {formato_miles(row['cant_consultorios'])}<br>
-
-                    <b>Afiliados/Cons.:</b> {formato_es(afi_cons_ratio) if pd.notna(afi_cons_ratio) else "-"}<br>
-
+                    <b>Afiliados/Cons.:</b> {formato_es(afi_cons_ratio)}<br>
                     <b>Dist. Media:</b> {formato_es(row['dist_media'])} km
-
                 </div>
-
             """
-
+            
             color = "#d62728" if row['cant_consultorios'] == 0 else "#1f77b4"
-
+            
             folium.CircleMarker(
-
                 location=[row['lat_ref'], row['lon_ref']],
-
                 radius=min(25, 5 + (row['cant_afiliados'] / 100)),
-
-                tooltip=folium.Tooltip(tooltip_txt),
-
-                color=color, fill=True, fill_opacity=0.6
-
+                tooltip=folium.Tooltip(tooltip_txt), # Usamos el HTML aquí
+                color=color, 
+                fill=True, 
+                fill_opacity=0.6
             ).add_to(m)
-
     else:
-
+        # Heatmap (Sigue igual)
         heat_data = [[row['lat_ref'], row['lon_ref'], row['cant_afiliados']] for _, row in data_filtrada.iterrows()]
-
         HeatMap(heat_data, radius=15, blur=10).add_to(m)
-
-
 
     st_folium(m, width="100%", height=550, key="mapa_dinamico")
 
 
 
-    # --- 5. TABLA DE DATOS ---
+    # --- TABLA DE DATOS ---
 
     st.markdown("---")
 
     st.subheader(f"📋 Detalle de Localidades ({prov_sel})")
 
+    
 
+    # Preparación de la tabla asegurando tipos de datos
 
-    # Selección de columnas incluyendo la nueva métrica
+    tabla_display = data_filtrada[['LOCALIDAD', 'PROVINCIA', 'cant_afiliados', 'dist_media', 'cant_consultorios']].copy()
 
-    tabla_display = data_filtrada[['LOCALIDAD', 'PROVINCIA', 'cant_afiliados', 'dist_media', 'cant_consultorios', 'afi_por_cons']].copy()
+    
+
+    # Convertir consultorios a entero para evitar el .0
 
     tabla_display['cant_consultorios'] = tabla_display['cant_consultorios'].astype(int)
 
-    tabla_display.columns = ['Localidad', 'Provincia', 'Afiliados', 'Dist. Media (Km)', 'Consultorios', 'Afiliados/Cons.']
+    
 
+    tabla_display.columns = ['Localidad', 'Provincia', 'Afiliados', 'Dist. Media (Km)', 'Consultorios']
 
+    
 
-    # Visualización en Streamlit con formato de coma para decimales
+    # Formateo de la tabla: Distancia con 2 decimales y Consultorios como entero (sin formato de miles con coma)
 
     st.dataframe(
 
         tabla_display.style.format({
 
-            'Dist. Media (Km)': lambda x: f"{x:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."),
+            'Dist. Media (Km)': '{:.2f}',
 
             'Afiliados': lambda x: f"{x:,}".replace(",", "."),
 
-            'Consultorios': lambda x: f"{int(x):,}".replace(",", "."),
-
-            'Afiliados/Cons.': lambda x: "-" if (pd.isna(x) or np.isinf(x)) else f"{x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+            'Consultorios': lambda x: f"{int(x):,}".replace(",", ".")
 
         }), 
 
@@ -324,19 +353,9 @@ try:
 
 
 
-    # --- DESCARGA ---
+    # Botón de Descarga
 
-    # Para el CSV, aplicamos el formato de texto para asegurar que el "-" y las comas se mantengan
-
-    df_download = tabla_display.copy()
-
-    df_download['Dist. Media (Km)'] = df_download['Dist. Media (Km)'].apply(lambda x: f"{x:.2f}".replace(".", ","))
-
-    df_download['Afiliados/Cons.'] = df_download['Afiliados/Cons.'].apply(lambda x: "-" if (pd.isna(x) or np.isinf(x)) else f"{x:.2f}".replace(".", ","))
-
-    
-
-    csv = df_download.to_csv(index=False).encode('utf-8-sig')
+    csv = tabla_display.to_csv(index=False).encode('utf-8-sig')
 
     st.download_button(
 
