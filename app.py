@@ -124,7 +124,7 @@ try:
                     <hr style="margin:5px 0;">
                     <b>Afiliados:</b> {formato_miles(row['cant_afiliados'])}<br>
                     <b>Consultorios:</b> {formato_miles(row['cant_consultorios'])}<br>
-                    <b>Afiliados/Cons.:</b> {formato_es(afi_cons_ratio) if pd.notna(afi_cons_ratio) else "-"}<br>
+                    <b>Afiliados/Cons.:</b> {formato_es(afi_cons_ratio) if (pd.notna(afi_cons_ratio) and not np.isinf(afi_cons_ratio)) else "-"}<br>
                     <b>Dist. Media:</b> {formato_es(row['dist_media'])} km
                 </div>
             """
@@ -145,27 +145,25 @@ try:
     st.markdown("---")
     st.subheader(f"📋 Detalle de Localidades ({prov_sel})")
 
-    # Selección de columnas incluyendo la nueva métrica
     tabla_display = data_filtrada[['LOCALIDAD', 'PROVINCIA', 'cant_afiliados', 'dist_media', 'cant_consultorios', 'afi_por_cons']].copy()
     tabla_display['cant_consultorios'] = tabla_display['cant_consultorios'].astype(int)
     tabla_display.columns = ['Localidad', 'Provincia', 'Afiliados', 'Dist. Media (Km)', 'Consultorios', 'Afiliados/Cons.']
 
-    # Visualización en Streamlit con formato de coma para decimales
+    # Visualización en Streamlit: corregido para mostrar "-" cuando no hay consultorios
     st.dataframe(
         tabla_display.style.format({
             'Dist. Media (Km)': lambda x: f"{x:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."),
-            'Afiliados': lambda x: f"{x:,}".replace(",", "."),
+            'Afiliados': lambda x: f"{int(x):,}".replace(",", "."),
             'Consultorios': lambda x: f"{int(x):,}".replace(",", "."),
-            'Afiliados/Cons.': lambda x: "-" if (pd.isna(x) or np.isinf(x)) else f"{x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+            'Afiliados/Cons.': lambda x: "-" if (pd.isna(x) or np.isinf(x) or x == 0) else f"{x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
         }), 
         use_container_width=True
     )
 
     # --- DESCARGA ---
-    # Para el CSV, aplicamos el formato de texto para asegurar que el "-" y las comas se mantengan
     df_download = tabla_display.copy()
     df_download['Dist. Media (Km)'] = df_download['Dist. Media (Km)'].apply(lambda x: f"{x:.2f}".replace(".", ","))
-    df_download['Afiliados/Cons.'] = df_download['Afiliados/Cons.'].apply(lambda x: "-" if (pd.isna(x) or np.isinf(x)) else f"{x:.2f}".replace(".", ","))
+    df_download['Afiliados/Cons.'] = df_download['Afiliados/Cons.'].apply(lambda x: "-" if (pd.isna(x) or np.isinf(x) or x == 0) else f"{x:.2f}".replace(".", ","))
     
     csv = df_download.to_csv(index=False).encode('utf-8-sig')
     st.download_button(
