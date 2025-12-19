@@ -152,7 +152,7 @@ try:
 
 
 
-    tipo_mapa = st.sidebar.radio("Tipo de Vista", ["Marcadores (Localidades)", "Heatmap (Demanda Insatisfecha)"])
+    tipo_mapa = st.sidebar.radio("Tipo de Vista", ["Marcadores (Localidades)", "Heatmap (Distribución de Afiliados)"])
 
 
 
@@ -357,4 +357,5 @@ try:
 except Exception as e:
 
     st.error(f"Error en la aplicación: {e}")
+
 
