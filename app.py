@@ -188,7 +188,6 @@ try:
     # APLICACIÓN DE FILTROS EN CASCADA
     data_filtrada = data_mapa_raw.copy()
     if prov_sel != "Todas":
-    if prov_sel != "Todas":
         data_filtrada = data_mapa_raw[data_mapa_raw['PROVINCIA'] == prov_sel]
         data_filtrada = data_filtrada[data_filtrada['PROVINCIA'] == prov_sel]
     if loc_sel != "Todas":
@@ -368,4 +367,5 @@ try:
 except Exception as e:
 
     st.error(f"Error en la aplicación: {e}")
+
 
