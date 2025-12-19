@@ -139,7 +139,7 @@ with st.expander("❓ ¿Cómo usar este tablero y qué significan las métricas?
     ### 📖 Guía de Usuario
     Este tablero permite analizar la relación geográfica entre nuestros **afiliados** y los **consultorios** disponibles.
     
-    * **Filtros:** Utilice el panel izquierdo para segmentar por provincia o ajustar el rango de distancia. 
+    * **Filtros:** Utilice el panel izquierdo para segmentar por provincia, localidad o ajustar el rango de distancia. 
     * **Tipos de Vista:** 
         * **Marcadores:** Muestra puntos exactos. El tamaño del círculo depende de la cantidad de afiliados. 
         * **Heatmap:** Muestra la densidad poblacional. Las zonas rojas son las de mayor concentración.
@@ -148,7 +148,7 @@ with st.expander("❓ ¿Cómo usar este tablero y qué significan las métricas?
     * **Éxito Geo:** Porcentaje de registros que tenían coordenadas válidas dentro de Argentina y pudieron ser mapeados.
     * **Distancia Media:** Es el promedio de kilómetros que deben recorrer los afiliados de esa localidad para llegar al consultorio más cercano.
     * **Afiliados/Cons.:** Indica cuántos afiliados "le corresponden" a cada consultorio en esa localidad.
-    * **Puntos Rojos en Mapa:** Localidades que tienen afiliados pero **0 consultorios** registrados.
+    * **Puntos Rojos:** Localidades que tienen afiliados pero **0 consultorios** registrados.
     """)
 
 try:
@@ -168,6 +168,12 @@ try:
     prov_sel = st.sidebar.selectbox("Seleccionar Provincia", list_prov)
 
 
+    # Filtro dinámico de Localidad
+    if prov_sel != "Todas":
+        list_loc = ["Todas"] + sorted(data_mapa_raw[data_mapa_raw['PROVINCIA'] == prov_sel]['LOCALIDAD'].unique().tolist())
+    else:
+        list_loc = ["Todas"] + sorted(data_mapa_raw['LOCALIDAD'].unique().tolist())
+    loc_sel = st.sidebar.selectbox("Seleccionar Localidad", list_loc)
 
     tipo_mapa = st.sidebar.radio("Tipo de Vista", ["Marcadores (Localidades)", "Heatmap (Distribución de Afiliados)"])
 
@@ -179,31 +185,20 @@ try:
 
 
 
-    # APLICAR FILTROS A LOS DATOS
-
+    # APLICACIÓN DE FILTROS EN CASCADA
+    data_filtrada = data_mapa_raw.copy()
     if prov_sel != "Todas":
-
+    if prov_sel != "Todas":
         data_filtrada = data_mapa_raw[data_mapa_raw['PROVINCIA'] == prov_sel]
-
+        data_filtrada = data_filtrada[data_filtrada['PROVINCIA'] == prov_sel]
+    if loc_sel != "Todas":
         afi_total_stats = len(afi_base[afi_base['PROVINCIA'] == prov_sel])
-
         afi_geo_stats = len(afi_geo_all[afi_geo_all['PROVINCIA'] == prov_sel])
-
         cons_total_stats = len(cons_base[cons_base['PROVINCIA'] == prov_sel])
-
         cons_geo_stats = len(cons_geo_all[cons_geo_all['PROVINCIA'] == prov_sel])
-
     else:
-
         data_filtrada = data_mapa_raw
-
-        afi_total_stats = len(afi_base)
-
-        afi_geo_stats = len(afi_geo_all)
-
-        cons_total_stats = len(cons_base)
-
-        cons_geo_stats = len(cons_geo_all)
+        data_filtrada = data_filtrada[data_filtrada['LOCALIDAD'] == loc_sel]
 
 
 
@@ -220,38 +215,32 @@ try:
     st.sidebar.subheader(f"📊 Estadísticas: {prov_sel}")
 
     
+    df_afi_stats = afi_base if prov_sel == "Todas" else afi_base[afi_base['PROVINCIA'] == prov_sel]
+    df_afi_geo_stats = afi_geo_all if prov_sel == "Todas" else afi_geo_all[afi_geo_all['PROVINCIA'] == prov_sel]
+    df_cons_stats = cons_base if prov_sel == "Todas" else cons_base[cons_base['PROVINCIA'] == prov_sel]
+    df_cons_geo_stats = cons_geo_all if prov_sel == "Todas" else cons_geo_all[cons_geo_all['PROVINCIA'] == prov_sel]
+
 
     # Métricas de Afiliados
 
     st.sidebar.write("**Afiliados**")
-
-    st.sidebar.write(f"Total Base: {formato_miles(afi_total_stats)}")
-
-    st.sidebar.write(f"En Mapa: {formato_miles(afi_geo_stats)}")
-
-    st.sidebar.info(f"Éxito Geo: {formato_porcentaje(afi_geo_stats, afi_total_stats)}")
-
+    # --- SIDEBAR: MÉTRICAS RECALCULADAS ---
+    st.sidebar.write(f"Total Base: {formato_miles(len(df_afi_stats))}")
+    st.sidebar.write(f"En Mapa: {formato_miles(len(df_afi_geo_stats))}")
+    st.sidebar.info(f"Éxito Geo: {formato_porcentaje(len(df_afi_geo_stats), len(df_afi_stats))}")
     
-
     st.sidebar.markdown("---")
 
-    
 
     # Métricas de Consultorios
 
     st.sidebar.write("**Consultorios**")
-
-    st.sidebar.write(f"Total Base: {formato_miles(cons_total_stats)}")
-
-    st.sidebar.write(f"En Mapa: {formato_miles(cons_geo_stats)}")
-
-    st.sidebar.success(f"Éxito Geo: {formato_porcentaje(cons_geo_stats, cons_total_stats)}")
-
-
+    st.sidebar.write(f"Total Base: {formato_miles(len(df_cons_stats))}")
+    st.sidebar.write(f"En Mapa: {formato_miles(len(df_cons_geo_stats))}")
+    st.sidebar.success(f"Éxito Geo: {formato_porcentaje(len(df_cons_geo_stats), len(df_cons_stats))}")
 
     st.sidebar.markdown("---")
 
-    
 
     # Métrica de Distancia Promedio (basada en el filtro aplicado)
 
@@ -266,7 +255,7 @@ try:
 # --- MAPA CON ZOOM DINÁMICO ---
     if not data_filtrada.empty:
         centro = [data_filtrada['lat_ref'].mean(), data_filtrada['lon_ref'].mean()]
-        zoom = 4 if prov_sel == "Todas" else 7
+        zoom = 4 if prov_sel == "Todas" and loc_sel == "Todas" else 7 if loc_sel == "Todas" else 12
     else:
         centro, zoom = [-38.4161, -63.6167], 4
 
@@ -276,8 +265,10 @@ try:
         for _, row in data_filtrada.iterrows():
             # Cálculo de la métrica específica para el tooltip
             afi_cons_ratio = row['cant_afiliados'] / row['cant_consultorios'] if row['cant_consultorios'] > 0 else np.nan
-            
-            # Construcción del Tooltip con HTML y CSS para recuperar el diseño anterior
+            afi_cons_txt = formato_es(afi_cons_ratio) if pd.notna(afi_cons_ratio) else "-"
+
+
+            # Construcción del Tooltip con HTML y CSS
             tooltip_txt = f"""
                 <div style="font-family: Arial; width: 220px;">
                     <h4 style="margin-bottom:5px; color:#1f77b4;">{row['LOCALIDAD']}</h4>
@@ -285,7 +276,7 @@ try:
                     <hr style="margin:5px 0;">
                     <b>Afiliados:</b> {formato_miles(row['cant_afiliados'])}<br>
                     <b>Consultorios:</b> {formato_miles(row['cant_consultorios'])}<br>
-                    <b>Afiliados/Cons.:</b> {formato_es(afi_cons_ratio)}<br>
+                    <b>Afiliados/Cons.:</b> {afi_cons_txt}<br>
                     <b>Dist. Media:</b> {formato_es(row['dist_media'])} km
                 </div>
             """
@@ -319,7 +310,7 @@ try:
 
     # Preparación de la tabla asegurando tipos de datos
 
-    tabla_display = data_filtrada[['LOCALIDAD', 'PROVINCIA', 'cant_afiliados', 'dist_media', 'cant_consultorios']].copy()
+    tabla_display = data_filtrada[['LOCALIDAD', 'PROVINCIA', 'cant_afiliados', 'dist_media', 'cant_consultorios', 'afi_por_cons']].copy()
 
     
 
@@ -329,7 +320,9 @@ try:
 
     
 
-    tabla_display.columns = ['Localidad', 'Provincia', 'Afiliados', 'Dist. Media (Km)', 'Consultorios']
+    tabla_display = tabla_display[['LOCALIDAD', 'PROVINCIA', 'cant_afiliados', 'dist_media', 'cant_consultorios', 'afi_por_cons']]
+
+    tabla_display.columns = ['Localidad', 'Provincia', 'Afiliados', 'Dist. Media (Km)', 'Consultorios', 'Afiliados/Cons.']
 
     
 
@@ -343,7 +336,8 @@ try:
 
             'Afiliados': lambda x: f"{x:,}".replace(",", "."),
 
-            'Consultorios': lambda x: f"{int(x):,}".replace(",", ".")
+            'Consultorios': lambda x: f"{int(x):,}".replace(",", "."),
+	    'Afiliados/Cons.': lambda x: "-" if (pd.isna(x) or np.isinf(x)) else f"{x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
         }), 
 
@@ -374,8 +368,4 @@ try:
 except Exception as e:
 
     st.error(f"Error en la aplicación: {e}")
-
-
-
-
 
