@@ -24,11 +24,9 @@ def formato_miles(valor):
 # --- 2. PROCESAMIENTO DE DATOS ---
 @st.cache_data
 def cargar_y_procesar_datos():
-    # Carga de archivos (Asegúrate que estos nombres coincidan con tus archivos reales)
     df_afi_raw = pd.read_csv('Afiliados interior geolocalizacion.csv')
     df_cons_raw = pd.read_csv('Consultorios GeoLocalizacion (1).csv')
 
-    # A. Deduplicación y limpieza
     df_afi_clean = df_afi_raw.drop_duplicates(subset=['AFI_ID', 'CALLE', 'NUMERO'])
     
     LAT_MIN, LAT_MAX = -56.0, -21.0
@@ -43,12 +41,10 @@ def cargar_y_procesar_datos():
     df_mapa_afi = filtrar_geo(df_afi_clean)
     df_mapa_cons = filtrar_geo(df_cons_raw)
 
-    # B. Cálculo de Distancias
     tree = cKDTree(df_mapa_cons[['LATITUD', 'LONGITUD']].values)
     dist, _ = tree.query(df_mapa_afi[['LATITUD', 'LONGITUD']].values, k=1)
     df_mapa_afi['distancia_km'] = dist * 111.13 
 
-    # C. Agrupación por Localidad
     resumen_afi = df_mapa_afi.groupby(['LOCALIDAD', 'PROVINCIA']).agg(
         cant_afiliados=('AFI_ID', 'nunique'),
         dist_media=('distancia_km', 'mean'),
@@ -61,16 +57,6 @@ def cargar_y_procesar_datos():
     data_final['afi_por_cons'] = data_final['cant_afiliados'] / data_final['cant_consultorios'].replace(0, np.nan)
     
     return data_final, df_afi_clean, df_cons_raw, df_mapa_afi, df_mapa_cons
-
-# --- 3. INTERFAZ Y FILTROS ---
-st.title("📍 Tablero de Gestión de Cobertura Sanitaria")
-
-with st.expander("❓ ¿Cómo usar este tablero y qué significan las métricas?"):
-    st.markdown("""
-    ### 📖 Guía de Usuario
-    * **Filtros:** Use el panel izquierdo para segmentar por Provincia, Localidad o Distancia.
-    * **Puntos Rojos:** Localidades con afiliados pero **0 consultorios** registrados.
-    """)
 
 try:
     data_mapa_raw, afi_base, cons_base, afi_geo_all, cons_geo_all = cargar_y_procesar_datos()
@@ -88,29 +74,33 @@ try:
     loc_sel = st.sidebar.selectbox("Seleccionar Localidad", list_loc)
 
     tipo_mapa = st.sidebar.radio("Tipo de Vista", ["Marcadores (Localidades)", "Heatmap (Distribución de Afiliados)"])
-
     max_dist_data = float(data_mapa_raw['dist_media'].max())
     dist_range = st.sidebar.slider("Rango de Distancia Promedio (Km)", 0.0, max_dist_data, (0.0, max_dist_data))
 
-    # --- APLICACIÓN DE FILTROS EN CASCADA (CORREGIDO) ---
+    # --- LÓGICA DE FILTRADO Y DETECCIÓN DE PROVINCIA ---
     data_filtrada = data_mapa_raw.copy()
-    
+    prov_display = prov_sel
+
     if prov_sel != "Todas":
         data_filtrada = data_filtrada[data_filtrada['PROVINCIA'] == prov_sel]
     
     if loc_sel != "Todas":
+        # Detectar la provincia de la localidad si no se seleccionó provincia manualmente
+        if prov_sel == "Todas":
+            prov_display = data_mapa_raw[data_mapa_raw['LOCALIDAD'] == loc_sel]['PROVINCIA'].iloc[0]
         data_filtrada = data_filtrada[data_filtrada['LOCALIDAD'] == loc_sel]
 
     data_filtrada = data_filtrada[data_filtrada['dist_media'].between(dist_range[0], dist_range[1])]
 
-    # --- SIDEBAR: ESTADÍSTICAS ---
+    # --- SIDEBAR: ESTADÍSTICAS POR PROVINCIA ---
     st.sidebar.markdown("---")
-    st.sidebar.subheader(f"📊 Estadísticas: {prov_sel}")
+    st.sidebar.subheader(f"📊 Estadísticas: {prov_display}")
     
-    df_afi_stats = afi_base if prov_sel == "Todas" else afi_base[afi_base['PROVINCIA'] == prov_sel]
-    df_afi_geo_stats = afi_geo_all if prov_sel == "Todas" else afi_geo_all[afi_geo_all['PROVINCIA'] == prov_sel]
-    df_cons_stats = cons_base if prov_sel == "Todas" else cons_base[cons_base['PROVINCIA'] == prov_sel]
-    df_cons_geo_stats = cons_geo_all if prov_sel == "Todas" else cons_geo_all[cons_geo_all['PROVINCIA'] == prov_sel]
+    # Las métricas usan prov_display para asegurar que sean por provincia
+    df_afi_stats = afi_base if prov_display == "Todas" else afi_base[afi_base['PROVINCIA'] == prov_display]
+    df_afi_geo_stats = afi_geo_all if prov_display == "Todas" else afi_geo_all[afi_geo_all['PROVINCIA'] == prov_display]
+    df_cons_stats = cons_base if prov_display == "Todas" else cons_base[cons_base['PROVINCIA'] == prov_display]
+    df_cons_geo_stats = cons_geo_all if prov_display == "Todas" else cons_geo_all[cons_geo_all['PROVINCIA'] == prov_display]
 
     st.sidebar.write("**Afiliados**")
     st.sidebar.write(f"Total Base: {formato_miles(len(df_afi_stats))}")
@@ -128,7 +118,8 @@ try:
         dist_prom_filtrada = data_filtrada['dist_media'].mean()
         st.sidebar.metric("Distancia Promedio", f"{formato_es(dist_prom_filtrada)} km")
 
-    # --- 4. MAPA ---
+    # --- MAPA Y TABLA ---
+    # (El resto del código de mapa se mantiene igual al anterior)
     if not data_filtrada.empty:
         centro = [data_filtrada['lat_ref'].mean(), data_filtrada['lon_ref'].mean()]
         zoom = 4 if prov_sel == "Todas" and loc_sel == "Todas" else 7 if loc_sel == "Todas" else 12
@@ -136,12 +127,10 @@ try:
         centro, zoom = [-38.4161, -63.6167], 4
 
     m = folium.Map(location=centro, zoom_start=zoom, tiles="cartodbpositron")
-
     if tipo_mapa == "Marcadores (Localidades)":
         for _, row in data_filtrada.iterrows():
             afi_cons_ratio = row['cant_afiliados'] / row['cant_consultorios'] if row['cant_consultorios'] > 0 else np.nan
             afi_cons_txt = formato_es(afi_cons_ratio) if pd.notna(afi_cons_ratio) else "-"
-            
             tooltip_txt = f"""
                 <div style="font-family: Arial; width: 220px;">
                     <h4 style="margin-bottom:5px; color:#1f77b4;">{row['LOCALIDAD']}</h4>
@@ -166,9 +155,8 @@ try:
 
     st_folium(m, width="100%", height=550, key="mapa_dinamico")
 
-    # --- 5. TABLA DE DATOS ---
     st.markdown("---")
-    st.subheader(f"📋 Detalle de Localidades ({prov_sel})")
+    st.subheader(f"📋 Detalle de Localidades ({prov_display})")
 
     if not data_filtrada.empty:
         tabla_display = data_filtrada[['LOCALIDAD', 'PROVINCIA', 'cant_afiliados', 'dist_media', 'cant_consultorios', 'afi_por_cons']].copy()
@@ -184,15 +172,20 @@ try:
             use_container_width=True
         )
 
-        csv = tabla_display.to_csv(index=False).encode('utf-8-sig')
+        # --- PREPARACIÓN DE DESCARGA LIMPIA ---
+        df_download = tabla_display.copy()
+        # Reemplazar valores nulos/infinitos por el guion medio para el CSV
+        df_download['Afiliados/Cons.'] = df_download['Afiliados/Cons.'].apply(
+            lambda x: "-" if (pd.isna(x) or np.isinf(x)) else f"{x:.2f}".replace(".", ",")
+        )
+        
+        csv = df_download.to_csv(index=False).encode('utf-8-sig')
         st.download_button(
             label="📥 Descargar tabla como CSV",
             data=csv,
-            file_name=f'reporte_cobertura_{prov_sel.lower()}.csv',
+            file_name=f'reporte_cobertura_{prov_display.lower()}.csv',
             mime='text/csv',
         )
-    else:
-        st.warning("No hay datos para los filtros seleccionados.")
 
 except Exception as e:
     st.error(f"Error en la aplicación: {e}")
