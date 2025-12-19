@@ -19,6 +19,7 @@ def formato_porcentaje(parte, total):
     return f"{(parte / total) * 100:.1f}".replace(".", ",") + " %"
 
 def formato_miles(valor):
+    if pd.isna(valor): return "0"
     return f"{int(valor):,}".replace(",", ".")
 
 # --- 2. PROCESAMIENTO DE DATOS ---
@@ -54,6 +55,8 @@ def cargar_y_procesar_datos():
 
     resumen_cons = df_mapa_cons.groupby(['LOCALIDAD', 'PROVINCIA']).size().reset_index(name='cant_consultorios')
     data_final = pd.merge(resumen_afi, resumen_cons, on=['LOCALIDAD', 'PROVINCIA'], how='left').fillna(0)
+    
+    # Métrica base
     data_final['afi_por_cons'] = data_final['cant_afiliados'] / data_final['cant_consultorios'].replace(0, np.nan)
     
     return data_final, df_afi_clean, df_cons_raw, df_mapa_afi, df_mapa_cons
@@ -85,18 +88,16 @@ try:
         data_filtrada = data_filtrada[data_filtrada['PROVINCIA'] == prov_sel]
     
     if loc_sel != "Todas":
-        # Detectar la provincia de la localidad si no se seleccionó provincia manualmente
-        if prov_sel == "Todas":
-            prov_display = data_mapa_raw[data_mapa_raw['LOCALIDAD'] == loc_sel]['PROVINCIA'].iloc[0]
+        # Detectar la provincia de la localidad para el panel de estadísticas
+        prov_display = data_mapa_raw[data_mapa_raw['LOCALIDAD'] == loc_sel]['PROVINCIA'].iloc[0]
         data_filtrada = data_filtrada[data_filtrada['LOCALIDAD'] == loc_sel]
 
     data_filtrada = data_filtrada[data_filtrada['dist_media'].between(dist_range[0], dist_range[1])]
 
-    # --- SIDEBAR: ESTADÍSTICAS POR PROVINCIA ---
+    # --- SIDEBAR: ESTADÍSTICAS FIJAS POR PROVINCIA ---
     st.sidebar.markdown("---")
     st.sidebar.subheader(f"📊 Estadísticas: {prov_display}")
     
-    # Las métricas usan prov_display para asegurar que sean por provincia
     df_afi_stats = afi_base if prov_display == "Todas" else afi_base[afi_base['PROVINCIA'] == prov_display]
     df_afi_geo_stats = afi_geo_all if prov_display == "Todas" else afi_geo_all[afi_geo_all['PROVINCIA'] == prov_display]
     df_cons_stats = cons_base if prov_display == "Todas" else cons_base[cons_base['PROVINCIA'] == prov_display]
@@ -114,12 +115,12 @@ try:
     st.sidebar.success(f"Éxito Geo: {formato_porcentaje(len(df_cons_geo_stats), len(df_cons_stats))}")
 
     st.sidebar.markdown("---")
-    if not data_filtrada.empty:
-        dist_prom_filtrada = data_filtrada['dist_media'].mean()
-        st.sidebar.metric("Distancia Promedio", f"{formato_es(dist_prom_filtrada)} km")
+    # Distancia Promedio calculada sobre la PROVINCIA (no cambia por localidad)
+    if not df_afi_geo_stats.empty:
+        dist_prom_prov = df_afi_geo_stats['distancia_km'].mean()
+        st.sidebar.metric("Distancia Promedio", f"{formato_es(dist_prom_prov)} km")
 
-    # --- MAPA Y TABLA ---
-    # (El resto del código de mapa se mantiene igual al anterior)
+    # --- 4. MAPA ---
     if not data_filtrada.empty:
         centro = [data_filtrada['lat_ref'].mean(), data_filtrada['lon_ref'].mean()]
         zoom = 4 if prov_sel == "Todas" and loc_sel == "Todas" else 7 if loc_sel == "Todas" else 12
@@ -129,8 +130,8 @@ try:
     m = folium.Map(location=centro, zoom_start=zoom, tiles="cartodbpositron")
     if tipo_mapa == "Marcadores (Localidades)":
         for _, row in data_filtrada.iterrows():
-            afi_cons_ratio = row['cant_afiliados'] / row['cant_consultorios'] if row['cant_consultorios'] > 0 else np.nan
-            afi_cons_txt = formato_es(afi_cons_ratio) if pd.notna(afi_cons_ratio) else "-"
+            ratio = row['cant_afiliados'] / row['cant_consultorios'] if row['cant_consultorios'] > 0 else np.nan
+            afi_cons_txt = formato_es(ratio) if pd.notna(ratio) else "-"
             tooltip_txt = f"""
                 <div style="font-family: Arial; width: 220px;">
                     <h4 style="margin-bottom:5px; color:#1f77b4;">{row['LOCALIDAD']}</h4>
@@ -155,6 +156,7 @@ try:
 
     st_folium(m, width="100%", height=550, key="mapa_dinamico")
 
+    # --- 5. TABLA DE DATOS ---
     st.markdown("---")
     st.subheader(f"📋 Detalle de Localidades ({prov_display})")
 
@@ -172,9 +174,9 @@ try:
             use_container_width=True
         )
 
-        # --- PREPARACIÓN DE DESCARGA LIMPIA ---
+        # --- DESCARGA CORREGIDA (SIN NONE) ---
         df_download = tabla_display.copy()
-        # Reemplazar valores nulos/infinitos por el guion medio para el CSV
+        # Convertimos a string y reemplazamos cualquier valor nulo o None por el guion
         df_download['Afiliados/Cons.'] = df_download['Afiliados/Cons.'].apply(
             lambda x: "-" if (pd.isna(x) or np.isinf(x)) else f"{x:.2f}".replace(".", ",")
         )
@@ -186,6 +188,8 @@ try:
             file_name=f'reporte_cobertura_{prov_display.lower()}.csv',
             mime='text/csv',
         )
+    else:
+        st.warning("No hay datos para los filtros seleccionados.")
 
 except Exception as e:
     st.error(f"Error en la aplicación: {e}")
