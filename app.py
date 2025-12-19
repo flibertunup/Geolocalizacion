@@ -132,6 +132,7 @@ def cargar_y_procesar_datos():
 
 st.title("📍 Tablero de Gestión de Cobertura Sanitaria")
 
+
 # --- SECCIÓN DE AYUDA / MANUAL ---
 with st.expander("❓ ¿Cómo usar este tablero y qué significan las métricas?"):
     st.markdown("""
@@ -139,7 +140,8 @@ with st.expander("❓ ¿Cómo usar este tablero y qué significan las métricas?
     Este tablero permite analizar la relación geográfica entre nuestros **afiliados** y los **consultorios** disponibles.
     
     * **Filtros:** Utilice el panel izquierdo para segmentar por provincia o ajustar el rango de distancia. 
-    * **Tipos de Vista:** * **Marcadores:** Muestra puntos exactos. El tamaño del círculo depende de la cantidad de afiliados. 
+    * **Tipos de Vista:** 
+        * **Marcadores:** Muestra puntos exactos. El tamaño del círculo depende de la cantidad de afiliados. 
         * **Heatmap:** Muestra la densidad poblacional. Las zonas rojas son las de mayor concentración.
     
     ### 📊 Glosario de Métricas
@@ -372,6 +374,7 @@ try:
 except Exception as e:
 
     st.error(f"Error en la aplicación: {e}")
+
 
 
 
