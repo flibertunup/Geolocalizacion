@@ -261,7 +261,10 @@ try:
 
     if tipo_mapa == "Marcadores (Localidades)":
         for _, row in data_filtrada.iterrows():
-            
+
+            # Definimos qué mostrar en la distancia y en el ratio si no hay afiliados
+            distancia_label = "-" if row['cant_afiliados'] == 0 else f"{formato_es(row['dist_media'])} km"
+
             # Construcción del Tooltip con HTML y CSS para recuperar el diseño anterior
             tooltip_txt = f"""
                 <div style="font-family: Arial; width: 220px;">
@@ -271,7 +274,7 @@ try:
                     <b>Afiliados:</b> {formato_miles(row['cant_afiliados'])}<br>
                     <b>Consultorios:</b> {formato_miles(row['cant_consultorios'])}<br>
                     <b>Afiliados/Cons.:</b> {formato_es(row['afi_por_cons']) if pd.notna(row['afi_por_cons']) else "-"}<br>
-                    <b>Dist. Media:</b> {formato_es(row['dist_media'])} km
+                    <b>Dist. Media:</b> {distancia_label}
                 </div>
             """
             
@@ -349,6 +352,7 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
 
 
