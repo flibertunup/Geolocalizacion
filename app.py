@@ -130,7 +130,7 @@ def cargar_y_procesar_datos():
 
 # --- 3. INTERFAZ Y FILTROS ---
 
-st.title("📍 Tablero de Gestión de Cobertura Sanitaria")
+st.title("📍 Tablero de Gestión de Cobertura Sanitaria", anchor=False)
 
 
 # --- SECCIÓN DE AYUDA / MANUAL ---
@@ -357,5 +357,6 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
 
