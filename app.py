@@ -269,7 +269,13 @@ try:
                 </div>
             """
             
-            color = "#d62728" if row['cant_consultorios'] == 0 else "#1f77b4"
+            if row['cant_afiliados'] == 0:
+                color = "#95a5a6" # GRIS: Solo consultorios (capacidad ociosa)
+            elif row['cant_consultorios'] == 0:
+                color = "#d62728" # ROJO: Afiliados sin consultorio local
+            else:
+                color = "#1f77b4" # AZUL: Localidad con ambos servicios
+                
             
             folium.CircleMarker(
                 location=[row['lat_ref'], row['lon_ref']],
@@ -335,6 +341,7 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
 
 
