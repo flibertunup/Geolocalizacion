@@ -321,7 +321,9 @@ try:
     # Aplicamos el formato manualmente a las columnas conflictivas para que Streamlit no use "None"
     df_styled['Afiliados'] = df_styled['Afiliados'].apply(lambda x: f"{int(x):,}".replace(",", "."))
     df_styled['Consultorios'] = df_styled['Consultorios'].apply(lambda x: f"{int(x):,}".replace(",", "."))
-    df_styled['Dist. Media (Km)'] = df_styled['Dist. Media (Km)'].apply(lambda x: f"{x:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+    df_styled['Dist. Media (Km)'] = df_styled['Dist. Media (Km)'].apply(
+    lambda x: "-" if pd.isna(x) else f"{x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+)
 
     # LA CLAVE: Forzamos el guion en la columna Afiliados/Cons. antes de pasar al dataframe
     df_styled['Afiliados/Cons.'] = df_styled['Afiliados/Cons.'].apply(
@@ -345,6 +347,7 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
 
 
