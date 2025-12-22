@@ -54,6 +54,10 @@ def cargar_y_procesar_datos():
     df_afi_raw = pd.read_csv('Afiliados interior geolocalizacion.csv')
     df_cons_raw = pd.read_csv('Consultorios GeoLocalizacion (1).csv')
 
+    FILTRO POR PAÍS
+    df_cons_raw = df_cons_raw[df_cons_raw['PAIS'] == 'ARGENTINA']
+
+    
     # A. Deduplicación y limpieza
     df_afi_clean = df_afi_raw.drop_duplicates(subset=['AFI_ID', 'CALLE', 'NUMERO'])
     
@@ -352,6 +356,7 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
 
 
