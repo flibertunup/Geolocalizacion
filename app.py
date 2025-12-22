@@ -308,77 +308,49 @@ try:
 
 
     # --- TABLA DE DATOS ---
+st.markdown("---")
+st.subheader(f"📋 Detalle de Localidades ({prov_sel})")
 
-    st.markdown("---")
+# 1. Preparamos la tabla
+tabla_display = data_filtrada[['LOCALIDAD', 'PROVINCIA', 'cant_afiliados', 'dist_media', 'cant_consultorios', 'afi_por_cons']].copy()
 
-    st.subheader(f"📋 Detalle de Localidades ({prov_sel})")
+# 2. Renombramos columnas
+tabla_display.columns = ['Localidad', 'Provincia', 'Afiliados', 'Dist. Media (Km)', 'Consultorios', 'Afiliados/Cons.']
 
-    
+# 3. Formateamos las columnas numéricas fijas
+# Afiliados y Consultorios a entero con punto de miles
+# Distancia Media con coma decimal
 
-    # Preparación de la tabla asegurando tipos de datos
+df_styled = tabla_display.copy()
 
-    tabla_display = data_filtrada[['LOCALIDAD', 'PROVINCIA', 'cant_afiliados', 'dist_media', 'cant_consultorios', 'afi_por_cons']].copy()
+# Aplicamos el formato manualmente a las columnas conflictivas para que Streamlit no use "None"
+df_styled['Afiliados'] = df_styled['Afiliados'].apply(lambda x: f"{int(x):,}".replace(",", "."))
+df_styled['Consultorios'] = df_styled['Consultorios'].apply(lambda x: f"{int(x):,}".replace(",", "."))
+df_styled['Dist. Media (Km)'] = df_styled['Dist. Media (Km)'].apply(lambda x: f"{x:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
 
-    
+# LA CLAVE: Forzamos el guion en la columna Afiliados/Cons. antes de pasar al dataframe
+df_styled['Afiliados/Cons.'] = df_styled['Afiliados/Cons.'].apply(
+lambda x: "-" if (pd.isna(x) or np.isinf(x)) else f"{x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+)
 
-    # Convertir consultorios a entero para evitar el .0
+# 4. Mostramos la tabla (ya procesada como texto para evitar el "None")
+st.dataframe(df_styled, use_container_width=True)
 
-    tabla_display['cant_consultorios'] = tabla_display['cant_consultorios'].astype(int)
-
-    
-
-    tabla_display.columns = ['Localidad', 'Provincia', 'Afiliados', 'Dist. Media (Km)', 'Consultorios', 'Afiliados/Cons.']
-
-    
-
-    # Formateo de la tabla: Distancia con 2 decimales y Consultorios como entero (sin formato de miles con coma)
-
-    st.dataframe(
-
-        tabla_display.style.format({
-
-            'Dist. Media (Km)': lambda x: f"{x:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."),
-
-            'Afiliados': lambda x: f"{int(x):,}".replace(",", "."),
-
-            'Consultorios': lambda x: f"{int(x):,}".replace(",", "."),
-            
-            'Afiliados/Cons.': lambda x: "-" if pd.isna(x) else f"{x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-
-        }), 
-
-        use_container_width=True
-
-    )
-
-
-
-    # Botón de Descarga
-
-    df_download = tabla_display.copy()
-
-    df_download['Dist. Media (Km)'] = df_download['Dist. Media (Km)'].apply(lambda x: f"{x:.2f}".replace(".", ","))
-
-    df_download['Afiliados/Cons.'] = df_download['Afiliados/Cons.'].apply(lambda x: "-" if pd.isna(x) else f"{x:.2f}".replace(".", ","))
-
-    csv = df_download.to_csv(index=False).encode('utf-8-sig')
-
-    st.download_button(
-
-        label="📥 Descargar tabla como CSV",
-
-        data=csv,
-
-        file_name=f'reporte_cobertura_{prov_sel.lower()}.csv',
-
-        mime='text/csv',
-
-    )
+# --- DESCARGA ---
+# Usamos la misma lógica para que el CSV sea consistente
+csv = df_styled.to_csv(index=False).encode('utf-8-sig')
+st.download_button(
+label="📥 Descargar tabla como CSV",
+data=csv,
+file_name=f'reporte_cobertura_{prov_sel.lower()}.csv',
+mime='text/csv',
+)
 
 
 
 except Exception as e:
 
     st.error(f"Error en la aplicación: {e}")
+
 
 
