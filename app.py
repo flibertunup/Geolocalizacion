@@ -274,8 +274,6 @@ try:
 
     if tipo_mapa == "Marcadores (Localidades)":
         for _, row in data_filtrada.iterrows():
-            # Cálculo de la métrica específica para el tooltip
-            afi_cons_ratio = row['cant_afiliados'] / row['cant_consultorios'] if row['cant_consultorios'] > 0 else np.nan
             
             # Construcción del Tooltip con HTML y CSS para recuperar el diseño anterior
             tooltip_txt = f"""
@@ -285,7 +283,7 @@ try:
                     <hr style="margin:5px 0;">
                     <b>Afiliados:</b> {formato_miles(row['cant_afiliados'])}<br>
                     <b>Consultorios:</b> {formato_miles(row['cant_consultorios'])}<br>
-                    <b>Afiliados/Cons.:</b> {formato_es(afi_cons_ratio)}<br>
+                    <b>Afiliados/Cons.:</b> {formato_es(row['afi_por_cons']) if pd.notna(row['afi_por_cons']) else "-"}
                     <b>Dist. Media:</b> {formato_es(row['dist_media'])} km
                 </div>
             """
@@ -319,7 +317,7 @@ try:
 
     # Preparación de la tabla asegurando tipos de datos
 
-    tabla_display = data_filtrada[['LOCALIDAD', 'PROVINCIA', 'cant_afiliados', 'dist_media', 'cant_consultorios']].copy()
+    tabla_display = data_filtrada[['LOCALIDAD', 'PROVINCIA', 'cant_afiliados', 'dist_media', 'cant_consultorios', 'afi_por_cons']].copy()
 
     
 
@@ -329,7 +327,7 @@ try:
 
     
 
-    tabla_display.columns = ['Localidad', 'Provincia', 'Afiliados', 'Dist. Media (Km)', 'Consultorios']
+    tabla_display.columns = ['Localidad', 'Provincia', 'Afiliados', 'Dist. Media (Km)', 'Consultorios', 'Afiliados/Cons.']
 
     
 
@@ -339,11 +337,13 @@ try:
 
         tabla_display.style.format({
 
-            'Dist. Media (Km)': '{:.2f}',
+            'Dist. Media (Km)': lambda x: f"{x:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."),
 
-            'Afiliados': lambda x: f"{x:,}".replace(",", "."),
+            'Afiliados': lambda x: f"{int(x):,}".replace(",", "."),
 
-            'Consultorios': lambda x: f"{int(x):,}".replace(",", ".")
+            'Consultorios': lambda x: f"{int(x):,}".replace(",", "."),
+            
+            'Afiliados/Cons.': lambda x: "-" if pd.isna(x) else f"{x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
         }), 
 
@@ -355,7 +355,13 @@ try:
 
     # Botón de Descarga
 
-    csv = tabla_display.to_csv(index=False).encode('utf-8-sig')
+    df_download = tabla_display.copy()
+
+    df_download['Dist. Media (Km)'] = df_download['Dist. Media (Km)'].apply(lambda x: f"{x:.2f}".replace(".", ","))
+
+    df_download['Afiliados/Cons.'] = df_download['Afiliados/Cons.'].apply(lambda x: "-" if pd.isna(x) else f"{x:.2f}".replace(".", ","))
+
+    csv = df_download.to_csv(index=False).encode('utf-8-sig')
 
     st.download_button(
 
@@ -374,3 +380,4 @@ try:
 except Exception as e:
 
     st.error(f"Error en la aplicación: {e}")
+
