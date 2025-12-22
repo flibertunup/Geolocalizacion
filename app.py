@@ -314,7 +314,7 @@ try:
 
     st.markdown("---")
 
-    st.subheader(f"📋 Detalle de Localidades ({prov_sel})")
+    st.subheader(f"📋 Detalle de Localidades ({prov_sel})", anchor=False)
 
 
     # Preparación de la tabla
@@ -357,6 +357,7 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
 
 
