@@ -158,7 +158,7 @@ try:
 
 
 
-    max_dist_data = float(data_mapa_raw['dist_media'].max())
+    max_dist_data = float(data_mapa_raw['dist_media'].dropna().max())
 
     dist_range = st.sidebar.slider("Rango de Distancia Promedio (Km)", 0.0, max_dist_data, (0.0, max_dist_data))
 
@@ -194,7 +194,9 @@ try:
 
     # Filtro de Distancia
 
-    data_filtrada = data_filtrada[data_filtrada['dist_media'].between(dist_range[0], dist_range[1])]
+    # Creamos una máscara que incluya los valores en rango O los valores nulos (0 afiliados)
+    mask_distancia = (data_filtrada['dist_media'].between(dist_range[0], dist_range[1])) | (data_filtrada['dist_media'].isna())
+    data_filtrada = data_filtrada[mask_distancia]
 
 
 
@@ -347,6 +349,7 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
 
 
