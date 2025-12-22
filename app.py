@@ -283,7 +283,7 @@ try:
                     <hr style="margin:5px 0;">
                     <b>Afiliados:</b> {formato_miles(row['cant_afiliados'])}<br>
                     <b>Consultorios:</b> {formato_miles(row['cant_consultorios'])}<br>
-                    <b>Afiliados/Cons.:</b> {formato_es(row['afi_por_cons']) if pd.notna(row['afi_por_cons']) else "-"}
+                    <b>Afiliados/Cons.:</b> {formato_es(row['afi_por_cons']) if pd.notna(row['afi_por_cons']) else "-"}<br>
                     <b>Dist. Media:</b> {formato_es(row['dist_media'])} km
                 </div>
             """
@@ -380,4 +380,5 @@ try:
 except Exception as e:
 
     st.error(f"Error en la aplicación: {e}")
+
 
