@@ -308,7 +308,9 @@ try:
 
 
     # --- TABLA DE DATOS ---
+
 st.markdown("---")
+
 st.subheader(f"📋 Detalle de Localidades ({prov_sel})")
 
 # 1. Preparamos la tabla
@@ -347,10 +349,10 @@ mime='text/csv',
 )
 
 
-
 except Exception as e:
 
     st.error(f"Error en la aplicación: {e}")
+
 
 
 
