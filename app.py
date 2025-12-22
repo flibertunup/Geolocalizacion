@@ -313,7 +313,9 @@ st.markdown("---")
 
 st.subheader(f"📋 Detalle de Localidades ({prov_sel})")
 
-# 1. Preparamos la tabla
+
+# Preparación de la tabla
+
 tabla_display = data_filtrada[['LOCALIDAD', 'PROVINCIA', 'cant_afiliados', 'dist_media', 'cant_consultorios', 'afi_por_cons']].copy()
 
 # 2. Renombramos columnas
@@ -352,6 +354,7 @@ mime='text/csv',
 except Exception as e:
 
     st.error(f"Error en la aplicación: {e}")
+
 
 
 
