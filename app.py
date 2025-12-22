@@ -351,9 +351,10 @@ try:
     )
 
 
-    except Exception as e:
+except Exception as e:
 
-        st.error(f"Error en la aplicación: {e}")
+      st.error(f"Error en la aplicación: {e}")
+
 
 
 
