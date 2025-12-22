@@ -141,14 +141,14 @@ with st.expander("❓ ¿Cómo usar este tablero y qué significan las métricas?
     
     * **Filtros:** Utilice el panel izquierdo para segmentar por provincia o ajustar el rango de distancia. 
     * **Tipos de Vista:** 
-        * **Marcadores:** Muestra puntos exactos. El tamaño del círculo depende de la cantidad de afiliados. 
+        * **Marcadores:** Muestra puntos exactos. El tamaño del círculo depende de la cantidad de afiliados. Los puntos rojos indican localidades que tienen afiliados pero **0 consultorios** localizados.
         * **Heatmap:** Muestra la densidad poblacional. Las zonas rojas son las de mayor concentración.
     
     ### 📊 Glosario de Métricas
     * **Éxito Geo:** Porcentaje de registros que tenían coordenadas válidas dentro de Argentina y pudieron ser mapeados.
     * **Distancia Media:** Es el promedio de kilómetros que deben recorrer los afiliados de esa localidad para llegar al consultorio más cercano.
     * **Afiliados/Cons.:** Indica cuántos afiliados "le corresponden" a cada consultorio en esa localidad.
-    * **Puntos Rojos en Mapa:** Localidades que tienen afiliados pero **0 consultorios** registrados.
+   # ---  * **Puntos Rojos en Mapa:** Localidades que tienen afiliados pero **0 consultorios** registrados. ---
     """)
 
 try:
@@ -354,6 +354,7 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
 
 
