@@ -120,7 +120,8 @@ with st.expander("❓ ¿Cómo usar este tablero y qué significan las métricas?
     
     * **Filtros:** Utilice el panel izquierdo para segmentar por provincia o ajustar el rango de distancia. 
     * **Tipos de Vista:** 
-        * **Marcadores:** Muestra puntos exactos. El tamaño del círculo depende de la cantidad de afiliados. Los puntos rojos indican localidades que tienen afiliados pero **0 consultorios** localizados.
+        * **Marcadores:** Muestra puntos exactos. El tamaño del círculo depende de la cantidad de afiliados. Los puntos rojos indican localidades que tienen afiliados pero **0 consultorios** localizados y los puntos grises
+        representan localidades que tienen consultorios pero ningún afiliado encontrado.
         * **Heatmap:** Muestra la densidad poblacional. Las zonas rojas son las de mayor concentración.
     """)
     
@@ -341,6 +342,7 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
 
 
