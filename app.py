@@ -89,7 +89,7 @@ def cargar_y_procesar_datos():
         lon_cons=('LONGITUD', 'mean')
     ).reset_index()
 
-    # D. EL CAMBIO CLAVE: MERGE OUTER
+    # D. USAMOS MERGE OUTER PARA MOSTRAR TAMBIÉN LOCALIDADES CON CONSULTORIOS SIN AFILIADOS.
     # Esto asegura que si hay consultorios en una ciudad sin afiliados, la ciudad NO desaparezca.
     data_final = pd.merge(resumen_afi, resumen_cons, on=['LOCALIDAD', 'PROVINCIA'], how='outer').fillna(0)
     
@@ -97,6 +97,9 @@ def cargar_y_procesar_datos():
     data_final['lat_ref'] = np.where(data_final['lat_ref'] == 0, data_final['lat_cons'], data_final['lat_ref'])
     data_final['lon_ref'] = np.where(data_final['lon_ref'] == 0, data_final['lon_cons'], data_final['lon_ref'])
 
+    # Si no hay afiliados, la distancia media no existe (NaN) para que luego se vea como "-"
+    data_final.loc[data_final['cant_afiliados'] == 0, 'dist_media'] = np.nan
+    
     # Cálculo del ratio
     data_final['afi_por_cons'] = data_final['cant_afiliados'] / data_final['cant_consultorios'].replace(0, np.nan)
     
@@ -342,6 +345,7 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
 
 
