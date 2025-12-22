@@ -151,12 +151,20 @@ try:
     st.sidebar.header("🔍 Filtros de Visualización")
 
     
-
+    # Filtro de Provincia
     list_prov = ["Todas"] + sorted(afi_base['PROVINCIA'].unique().tolist())
 
     prov_sel = st.sidebar.selectbox("Seleccionar Provincia", list_prov)
 
-
+    # Filtro de Localidad (en cascada)
+    loc_sel = "Todas"
+    if prov_sel != "Todas":
+        # Solo mostramos localidades que pertenecen a la provincia elegida
+        list_loc = ["Todas"] + sorted(data_mapa_raw[data_mapa_raw['PROVINCIA'] == prov_sel]['LOCALIDAD'].unique().tolist())
+        loc_sel = st.sidebar.selectbox("Seleccionar Localidad", list_loc)
+    else:
+        st.sidebar.info("Seleccione una provincia para filtrar por localidad.")
+        
 
     tipo_mapa = st.sidebar.radio("Tipo de Vista", ["Marcadores (Localidades)", "Heatmap (Distribución de Afiliados)"])
 
@@ -166,33 +174,24 @@ try:
 
     dist_range = st.sidebar.slider("Rango de Distancia Promedio (Km)", 0.0, max_dist_data, (0.0, max_dist_data))
 
+    
+    # --- APLICAR FILTROS EN CADENA ---
+    data_filtrada = data_mapa_raw.copy()
 
-
-    # APLICAR FILTROS A LOS DATOS
-
+    # 1. Filtro Provincia
     if prov_sel != "Todas":
-
-        data_filtrada = data_mapa_raw[data_mapa_raw['PROVINCIA'] == prov_sel]
-
+        data_filtrada = data_filtrada[data_filtrada['PROVINCIA'] == prov_sel]
         afi_total_stats = len(afi_base[afi_base['PROVINCIA'] == prov_sel])
-
         afi_geo_stats = len(afi_geo_all[afi_geo_all['PROVINCIA'] == prov_sel])
-
         cons_total_stats = len(cons_base[cons_base['PROVINCIA'] == prov_sel])
-
         cons_geo_stats = len(cons_geo_all[cons_geo_all['PROVINCIA'] == prov_sel])
-
     else:
+        afi_total_stats, afi_geo_stats = len(afi_base), len(afi_geo_all)
+        cons_total_stats, cons_geo_stats = len(cons_base), len(cons_geo_all)
 
-        data_filtrada = data_mapa_raw
-
-        afi_total_stats = len(afi_base)
-
-        afi_geo_stats = len(afi_geo_all)
-
-        cons_total_stats = len(cons_base)
-
-        cons_geo_stats = len(cons_geo_all)
+    # 2. Filtro Localidad
+    if loc_sel != "Todas":
+        data_filtrada = data_filtrada[data_filtrada['LOCALIDAD'] == loc_sel]
 
 
 
@@ -356,6 +355,7 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
 
 
