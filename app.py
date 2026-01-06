@@ -110,7 +110,7 @@ def cargar_y_procesar_datos():
     # Limpiamos columnas auxiliares
     data_final = data_final.drop(columns=['lat_cons', 'lon_cons'])
     
-    return data_final, df_afi_clean, df_cons_raw, df_mapa_afi, df_mapa_cons, df_afi_raw, df_cons_raw
+    return data_final, df_afi_clean, df_cons_raw, df_mapa_afi, df_mapa_cons
 
 
 # --- 3. INTERFAZ Y FILTROS ---
@@ -351,50 +351,7 @@ try:
     mime='text/csv',
     )
 
-    # --- SECCIÓN PARA DESARROLLADORES (OCULTA) ---
-    # Usamos st.query_params para detectar ?dev=true en la URL
-    if st.query_params.get("dev") == "true":
-        st.markdown("---")
-        st.success("🔓 **Modo Desarrollador Activado**")
-        st.subheader("🛠️ Panel de Control: Calidad de Datos")
-        
-        col_dev1, col_dev2 = st.columns(2)
-        
-        # Identificar AFILIADOS que no pasaron el filtro geográfico
-        ids_en_mapa = afi_geo_all['AFI_ID'].unique()
-        afi_errores = afi_base[~afi_base['AFI_ID'].isin(ids_en_mapa)]
-        
-        with col_dev1:
-            st.metric("Afiliados fuera de Mapa", f"{len(afi_errores):,}".replace(",", "."))
-            st.caption("Registros con coordenadas inválidas o vacías.")
-            csv_afi_err = afi_errores.to_csv(index=False).encode('utf-8-sig')
-            st.download_button(
-                label="📥 Descargar Afiliados con Error", 
-                data=csv_afi_err, 
-                file_name="afiliados_no_localizados.csv",
-                key="dev_afi_download"
-            )
-
-        # Identificar CONSULTORIOS que no pasaron el filtro geográfico o de país
-        cons_en_mapa_idx = cons_geo_all.index
-        cons_errores = cons_base[~cons_base.index.isin(cons_en_mapa_idx)]
-        
-        with col_dev2:
-            st.metric("Consultorios fuera de Mapa", f"{len(cons_errores):,}".replace(",", "."))
-            st.caption("Incluye registros de Uruguay o fuera de límites geo.")
-            csv_cons_err = cons_errores.to_csv(index=False).encode('utf-8-sig')
-            st.download_button(
-                label="📥 Descargar Consultorios con Error", 
-                data=csv_cons_err, 
-                file_name="consultorios_no_localizados.csv",
-                key="dev_cons_download"
-            )
 
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
-
-
-
-
-
