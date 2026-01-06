@@ -15,6 +15,9 @@ from scipy.spatial import cKDTree
 import io
 
 
+# --- SEGURIDAD ---
+CLAVE_DESARROLLADOR = "admin123" # Cambia esto por tu clave
+
 
 # Configuración de la página
 
@@ -150,6 +153,27 @@ try:
 
     st.sidebar.header("🔍 Filtros de Visualización")
 
+    # --- SISTEMA DE ACCESO ---
+    st.sidebar.markdown("---")
+    # Inicializamos el estado si no existe
+    if 'es_dev' not in st.session_state:
+        st.session_state.es_dev = False
+
+    if not st.session_state.es_dev:
+        with st.sidebar.expander("🔑 Acceso Staff"):
+            password = st.text_input("Contraseña", type="password")
+            if st.button("Desbloquear herramientas"):
+                if password == CLAVE_DESARROLLADOR:
+                    st.session_state.es_dev = True
+                    st.rerun()
+                else:
+                    st.error("Clave incorrecta")
+    else:
+        st.sidebar.success("🔓 Modo Desarrollador Activo")
+        if st.sidebar.button("Cerrar Sesión"):
+            st.session_state.es_dev = False
+            st.rerun()
+    
     
     # Filtro de Provincia
     list_prov = ["Todas"] + sorted(afi_base['PROVINCIA'].unique().tolist())
@@ -351,7 +375,46 @@ try:
     mime='text/csv',
     )
 
+    # --- PANEL SOLO PARA DESARROLLADORES ---
+    if st.session_state.es_dev:
+        st.markdown("---")
+        st.subheader("🛠️ Descargas de Auditoría (Registros no localizados)")
+        st.info("Estos archivos contienen los registros originales que no pudieron ser ubicados en el mapa por errores de coordenadas o país.")
+        
+        col1, col2 = st.columns(2)
+
+        # 1. Afiliados no encontrados
+        # Comparamos la base total vs los que sí entraron al mapa
+        ids_en_mapa = afi_geo_all['AFI_ID'].unique()
+        # Usamos df_afi_raw (retornado por tu función) para mantener el formato original
+        afi_no_encontrados = afi_base[~afi_base['AFI_ID'].isin(ids_en_mapa)]
+
+        with col1:
+            st.write(f"**Afiliados con error:** {len(afi_no_encontrados)}")
+            btn_afi = st.download_button(
+                label="📥 Descargar Afiliados con Error",
+                data=afi_no_encontrados.to_csv(index=False).encode('utf-8-sig'),
+                file_name="errores_afiliados_original.csv",
+                mime="text/csv",
+                key="btn_dev_afi"
+            )
+
+        # 2. Consultorios no encontrados
+        # Comparamos por índice para ser precisos con los originales
+        cons_en_mapa_idx = cons_geo_all.index
+        cons_no_encontrados = cons_base[~cons_base.index.isin(cons_en_mapa_idx)]
+
+        with col2:
+            st.write(f"**Consultorios con error:** {len(cons_no_encontrados)}")
+            btn_cons = st.download_button(
+                label="📥 Descargar Consultorios con Error",
+                data=cons_no_encontrados.to_csv(index=False).encode('utf-8-sig'),
+                file_name="errores_consultorios_original.csv",
+                mime="text/csv",
+                key="btn_dev_cons"
+            )
 
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
