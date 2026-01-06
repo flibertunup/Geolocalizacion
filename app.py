@@ -357,6 +357,7 @@ try:
     
    if query_params.get("dev") == "true":
         st.markdown("---")
+        st.success("🔓 **Modo Desarrollador Activado**")
         st.subheader("🛠️ Panel de Control: Calidad de Datos")
         
         col_dev1, col_dev2 = st.columns(2)
@@ -368,7 +369,12 @@ try:
         with col_dev1:
             st.metric("Afiliados fuera de Mapa", f"{len(afi_errores):,}".replace(",", "."))
             csv_afi_err = afi_errores.to_csv(index=False).encode('utf-8-sig')
-            st.download_button(label="📥 Descargar Afiliados con Error", data=csv_afi_err, file_name="afiliados_no_localizados.csv")
+            st.download_button(
+                label="📥 Descargar Afiliados con Error", 
+                data=csv_afi_err, 
+                file_name="afiliados_no_localizados.csv",
+                key="dev_afi_download" # Key única para evitar conflictos
+            )
 
         # Lógica para Consultorios No Localizados
         cons_en_mapa_idx = cons_geo_all.index
@@ -377,11 +383,17 @@ try:
         with col_dev2:
             st.metric("Consultorios fuera de Mapa", f"{len(cons_errores):,}".replace(",", "."))
             csv_cons_err = cons_errores.to_csv(index=False).encode('utf-8-sig')
-            st.download_button(label="📥 Descargar Consultorios con Error", data=csv_cons_err, file_name="consultorios_no_localizados.csv")
+            st.download_button(
+                label="📥 Descargar Consultorios con Error", 
+                data=csv_cons_err, 
+                file_name="consultorios_no_localizados.csv",
+                key="dev_cons_download" # Key única para evitar conflictos
+            )
 
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
 
 
