@@ -162,7 +162,7 @@ try:
     if not st.session_state.es_dev:
         with st.sidebar.expander("🔑 Acceso Staff"):
             password = st.text_input("Contraseña", type="password")
-            if st.button("Desbloquear herramientas"):
+            if st.button("Iniciar sesión"):
                 if password == CLAVE_DESARROLLADOR:
                     st.session_state.es_dev = True
                     st.rerun()
@@ -417,5 +417,6 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
 
