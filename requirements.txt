@@ -4,3 +4,5 @@ numpy
 folium
 streamlit-folium
 scipy
+psycopg2-binary
+sqlalchemy
