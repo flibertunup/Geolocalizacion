@@ -390,11 +390,11 @@ try:
         afi_no_encontrados = afi_base[~afi_base['AFI_ID'].isin(ids_en_mapa)]
 
         with col1:
-            st.write(f"**Afiliados con error:** {len(afi_no_encontrados)}")
+            st.write(f"**Afiliados no localizados:** {formato_miles(len(afi_no_encontrados))}")
             btn_afi = st.download_button(
-                label="📥 Descargar Afiliados con Error",
+                label="📥 Descargar Afiliados No Localizados",
                 data=afi_no_encontrados.to_csv(index=False).encode('utf-8-sig'),
-                file_name="errores_afiliados_original.csv",
+                file_name="afiliados_no_localizados.csv",
                 mime="text/csv",
                 key="btn_dev_afi"
             )
@@ -405,11 +405,11 @@ try:
         cons_no_encontrados = cons_base[~cons_base.index.isin(cons_en_mapa_idx)]
 
         with col2:
-            st.write(f"**Consultorios con error:** {len(cons_no_encontrados)}")
+            st.write(f"**Consultorios no localizados:** {formato_miles(len(cons_no_encontrados))}")
             btn_cons = st.download_button(
-                label="📥 Descargar Consultorios con Error",
+                label="📥 Descargar Consultorios No Localizados",
                 data=cons_no_encontrados.to_csv(index=False).encode('utf-8-sig'),
-                file_name="errores_consultorios_original.csv",
+                file_name="consultorios_no_localizados.csv",
                 mime="text/csv",
                 key="btn_dev_cons"
             )
@@ -417,4 +417,5 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
