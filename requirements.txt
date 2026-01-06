@@ -4,5 +4,6 @@ numpy
 folium
 streamlit-folium
 scipy
-psycopg2-binary
+oracledb
 sqlalchemy
+
