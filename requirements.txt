@@ -4,6 +4,3 @@ numpy
 folium
 streamlit-folium
 scipy
-oracledb
-sqlalchemy
-
