@@ -110,7 +110,7 @@ def cargar_y_procesar_datos():
     # Limpiamos columnas auxiliares
     data_final = data_final.drop(columns=['lat_cons', 'lon_cons'])
     
-    return data_final, df_afi_clean, df_cons_raw, df_mapa_afi, df_mapa_cons, df_afi_raw, df_cons_raw_completa
+    return data_final, df_afi_clean, df_cons_raw, df_mapa_afi, df_mapa_cons, df_afi_raw, df_cons_raw
 
 
 # --- 3. INTERFAZ Y FILTROS ---
@@ -355,46 +355,33 @@ try:
     # Se activa agregando ?dev=true a la URL
     query_params = st.query_params
     
-    if query_params.get("dev") == "true":
-        st.write("---")
-        st.subheader("🛠️ Panel de Desarrollador: Registros No Localizados")
+   if query_params.get("dev") == "true":
+        st.markdown("---")
+        st.subheader("🛠️ Panel de Control: Calidad de Datos")
         
-        col1, col2 = st.columns(2)
+        col_dev1, col_dev2 = st.columns(2)
         
-        # 1. AFILIADOS NO LOCALIZADOS
-        # Identificamos los IDs que NO están en df_mapa_afi
-        ids_localizados = afi_geo_all['AFI_ID'].unique()
-        afi_no_loc = afi_base[~afi_base['AFI_ID'].isin(ids_localizados)]
+        # Lógica para Afiliados No Localizados
+        ids_en_mapa = afi_geo_all['AFI_ID'].unique()
+        afi_errores = afi_base[~afi_base['AFI_ID'].isin(ids_en_mapa)]
         
-        with col1:
-            st.warning(f"Afiliados fuera de mapa: {len(afi_no_loc)}")
-            csv_afi_error = afi_no_loc.to_csv(index=False).encode('utf-8-sig')
-            st.download_button(
-                label="📥 Descargar Afiliados NO Localizados",
-                data=csv_afi_error,
-                file_name='afiliados_sin_geolocalizacion.csv',
-                mime='text/csv',
-                key="btn_dev_afi"
-            )
+        with col_dev1:
+            st.metric("Afiliados fuera de Mapa", f"{len(afi_errores):,}".replace(",", "."))
+            csv_afi_err = afi_errores.to_csv(index=False).encode('utf-8-sig')
+            st.download_button(label="📥 Descargar Afiliados con Error", data=csv_afi_err, file_name="afiliados_no_localizados.csv")
 
-        # 2. CONSULTORIOS NO LOCALIZADOS
-        # (Considerando los que filtramos por PAIS o por coordenadas)
-        # Identificamos por dirección/nombre ya que no suelen tener un ID único tan claro como el afiliado
-        cons_no_loc = cons_base[~cons_base.index.isin(cons_geo_all.index)]
+        # Lógica para Consultorios No Localizados
+        cons_en_mapa_idx = cons_geo_all.index
+        cons_errores = cons_base[~cons_base.index.isin(cons_en_mapa_idx)]
         
-        with col2:
-            st.error(f"Consultorios fuera de mapa: {len(cons_no_loc)}")
-            csv_cons_error = cons_no_loc.to_csv(index=False).encode('utf-8-sig')
-            st.download_button(
-                label="📥 Descargar Consultorios NO Localizados",
-                data=csv_cons_error,
-                file_name='consultorios_sin_geolocalizacion.csv',
-                mime='text/csv',
-                key="btn_dev_cons"
-            )
+        with col_dev2:
+            st.metric("Consultorios fuera de Mapa", f"{len(cons_errores):,}".replace(",", "."))
+            csv_cons_err = cons_errores.to_csv(index=False).encode('utf-8-sig')
+            st.download_button(label="📥 Descargar Consultorios con Error", data=csv_cons_err, file_name="consultorios_no_localizados.csv")
 
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
 
