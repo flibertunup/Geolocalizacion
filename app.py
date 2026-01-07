@@ -21,7 +21,12 @@ import pyodbc
 
 @st.cache_resource
 def conectar_db():
-    return pyodbc.connect('DSN=PostgresUP')
+    try:
+        # Intenta conectar al DSN local del servidor
+        return pyodbc.connect('DSN=PostgresUP')
+    except Exception as e:
+        # Si falla (como en la cuenta gratuita), devuelve None o un aviso
+        return None
     
 
 # --- SEGURIDAD ---
@@ -430,6 +435,7 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
 
 
