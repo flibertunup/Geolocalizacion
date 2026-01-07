@@ -149,7 +149,7 @@ with st.expander("❓ ¿Cómo usar este tablero y qué significan las métricas?
     st.markdown("""
     * **Éxito Geo:** Porcentaje de registros que tenían coordenadas válidas dentro de Argentina y pudieron ser mapeados.
     * **Distancia Media:** Es el promedio de kilómetros que deben recorrer los afiliados para llegar al consultorio más cercano.
-    * **Afiliados/Cons.:** Indica cuántos afiliados "le corresponden" a cada consultorio en esa localidad.
+    * **Cons./Afiliados:** Indica cuántos consultorios hay disponibles por cada afiliado en esa localidad.
     """)
 
 try:
@@ -309,7 +309,8 @@ try:
                     <hr style="margin:5px 0;">
                     <b>Afiliados:</b> {formato_miles(row['cant_afiliados'])}<br>
                     <b>Consultorios:</b> {formato_miles(row['cant_consultorios'])}<br>
-                    <b>Afiliados/Cons.:</b> {formato_es(row['afi_por_cons']) if pd.notna(row['afi_por_cons']) else "-"}<br>
+                   # <b>Afiliados/Cons.:</b> {formato_es(row['afi_por_cons']) if pd.notna(row['afi_por_cons']) else "-"}<br>
+                    <b>Cons./Afiliados:</b> {formato_es(row['cons_por_afi']) if pd.notna(row['cons_por_afi']) else "-"}<br>
                     <b>Dist. Media:</b> {distancia_label}
                 </div>
             """
@@ -348,10 +349,10 @@ try:
 
     # Preparación de la tabla
 
-    tabla_display = data_filtrada[['LOCALIDAD', 'PROVINCIA', 'cant_afiliados', 'dist_media', 'cant_consultorios', 'afi_por_cons']].copy()
+    tabla_display = data_filtrada[['LOCALIDAD', 'PROVINCIA', 'cant_afiliados', 'dist_media', 'cant_consultorios', 'cons_por_afi']].copy()
 
     # 2. Renombramos columnas
-    tabla_display.columns = ['Localidad', 'Provincia', 'Afiliados', 'Dist. Media (Km)', 'Consultorios', 'Afiliados/Cons.']
+    tabla_display.columns = ['Localidad', 'Provincia', 'Afiliados', 'Dist. Media (Km)', 'Consultorios', 'Cons./Afiliados']
 
     # 3. Formateamos las columnas numéricas fijas
     # Afiliados y Consultorios a entero con punto de miles
@@ -367,10 +368,13 @@ try:
 )
 
     # LA CLAVE: Forzamos el guion en la columna Afiliados/Cons. antes de pasar al dataframe
-    df_styled['Afiliados/Cons.'] = df_styled['Afiliados/Cons.'].apply(
-    lambda x: "-" if (pd.isna(x) or np.isinf(x)) else f"{x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-    )
+   # df_styled['Afiliados/Cons.'] = df_styled['Afiliados/Cons.'].apply(
+   # lambda x: "-" if (pd.isna(x) or np.isinf(x)) else f"{x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+   # )
 
+    df_styled['Cons./Afiliados'] = df_styled['Cons./Afiliados'].apply(lambda x: "-" if (pd.isna(x) or np.isinf(x)) else formato_es(x))
+    
+    
     # 4. Mostramos la tabla (ya procesada como texto para evitar el "None")
     st.dataframe(df_styled, use_container_width=True)
 
@@ -426,6 +430,7 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
 
 
