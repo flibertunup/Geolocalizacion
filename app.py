@@ -18,7 +18,9 @@ import pyodbc
 
 
 # Función con caché para no conectar a la DB en cada click:
-
+@st.cache_resource
+def conectar_db():
+    return pyodbc.connect('DSN=PostgresUP')
     
 
 # --- SEGURIDAD ---
@@ -427,6 +429,7 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
 
 
