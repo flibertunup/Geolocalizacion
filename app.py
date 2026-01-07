@@ -14,6 +14,15 @@ from scipy.spatial import cKDTree
 
 import io
 
+import pyodbc
+
+
+# Función con caché para no conectar a la DB en cada click:
+
+@st.cache_resource
+def conectar_db():
+    return pyodbc.connect('DSN=PostgresUP')
+    
 
 # --- SEGURIDAD ---
 CLAVE_DESARROLLADOR = "admin123" # Cambia esto por tu clave
@@ -417,6 +426,7 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
 
 
