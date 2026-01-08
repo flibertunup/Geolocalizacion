@@ -116,7 +116,8 @@ def cargar_y_procesar_datos():
     data_final.loc[data_final['cant_afiliados'] == 0, 'dist_media'] = np.nan
     
     # Cálculo del ratio
-    data_final['afi_por_cons'] = data_final['cant_afiliados'] / data_final['cant_consultorios'].replace(0, np.nan)
+    # data_final['afi_por_cons'] = data_final['cant_afiliados'] / data_final['cant_consultorios'].replace(0, np.nan)
+    data_final['cons_por_afi'] = data_final['cant_consultorios'] / data_final['cant_afiliados'].replace(0, np.nan)
     
     # Limpiamos columnas auxiliares
     data_final = data_final.drop(columns=['lat_cons', 'lon_cons'])
@@ -429,6 +430,7 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
 
 
