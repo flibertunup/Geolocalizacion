@@ -247,12 +247,23 @@ try:
 
     st.sidebar.write("**Afiliados**")
 
-    st.sidebar.write(f"Total Base: {formato_miles(afi_total_stats)}")
+    # MODIFICACIÓN MANUAL SEGÚN PEDIDO:
+    if prov_sel == "Todas":
+        val_total_afi_mostrar = "555.896"
+    else:
+        # Si filtra por provincia, dejamos el cálculo real de la base actual
+        val_total_afi_mostrar = formato_miles(afi_total_stats)
+        
+    st.sidebar.write(f"Total Base: {val_total_afi_mostrar}")
 
     st.sidebar.write(f"En Mapa: {formato_miles(afi_geo_stats)}")
 
-    st.sidebar.info(f"Éxito Geo: {formato_porcentaje(afi_geo_stats, afi_total_stats)}")
-
+    # Calculamos el porcentaje basado en el número manual si es "Todas"
+    if prov_sel == "Todas":
+        perc_afi = (afi_geo_stats / 555896) * 100
+        st.sidebar.info(f"Éxito Geo: {perc_afi:.1f}".replace(".", ",") + " %")
+    else:
+        st.sidebar.info(f"Éxito Geo: {formato_porcentaje(afi_geo_stats, afi_total_stats)}")
     
 
     st.sidebar.markdown("---")
@@ -263,11 +274,22 @@ try:
 
     st.sidebar.write("**Consultorios**")
 
-    st.sidebar.write(f"Total Base: {formato_miles(cons_total_stats)}")
+    # MODIFICACIÓN MANUAL SEGÚN PEDIDO:
+    if prov_sel == "Todas":
+        val_total_cons_mostrar = "116.587"
+    else:
+        val_total_cons_mostrar = formato_miles(cons_total_stats)
+        
+    st.sidebar.write(f"Total Base: {val_total_cons_mostrar}")
 
     st.sidebar.write(f"En Mapa: {formato_miles(cons_geo_stats)}")
 
-    st.sidebar.success(f"Éxito Geo: {formato_porcentaje(cons_geo_stats, cons_total_stats)}")
+    # Calculamos el porcentaje basado en el número manual si es "Todas"
+    if prov_sel == "Todas":
+        perc_cons = (cons_geo_stats / 116587) * 100
+        st.sidebar.success(f"Éxito Geo: {perc_cons:.1f}".replace(".", ",") + " %")
+    else:
+        st.sidebar.success(f"Éxito Geo: {formato_porcentaje(cons_geo_stats, cons_total_stats)}")
 
 
 
@@ -428,6 +450,7 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
 
 
