@@ -116,7 +116,6 @@ def cargar_y_procesar_datos():
     data_final.loc[data_final['cant_afiliados'] == 0, 'dist_media'] = np.nan
     
     # Cálculo del ratio
-    # data_final['afi_por_cons'] = data_final['cant_afiliados'] / data_final['cant_consultorios'].replace(0, np.nan)
     data_final['cons_por_afi'] = data_final['cant_consultorios'] / data_final['cant_afiliados'].replace(0, np.nan)
     
     # Limpiamos columnas auxiliares
@@ -309,7 +308,6 @@ try:
                     <hr style="margin:5px 0;">
                     <b>Afiliados:</b> {formato_miles(row['cant_afiliados'])}<br>
                     <b>Consultorios:</b> {formato_miles(row['cant_consultorios'])}<br>
-                   # <b>Afiliados/Cons.:</b> {formato_es(row['afi_por_cons']) if pd.notna(row['afi_por_cons']) else "-"}<br>
                     <b>Cons./Afiliados:</b> {formato_es(row['cons_por_afi']) if pd.notna(row['cons_por_afi']) else "-"}<br>
                     <b>Dist. Media:</b> {distancia_label}
                 </div>
@@ -430,6 +428,7 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
 
 
