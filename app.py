@@ -75,6 +75,27 @@ def cargar_y_procesar_datos():
     LAT_MIN, LAT_MAX = -56.0, -21.0
     LON_MIN, LON_MAX = -74.0, -53.0
 
+
+    # --- LÓGICA PARALELA PARA DESCARGAS (No afecta al mapa) ---
+    def etiquetar_errores(df):
+        temp = df.copy()
+        lat_n = pd.to_numeric(temp['LATITUD'], errors='coerce')
+        lon_n = pd.to_numeric(temp['LONGITUD'], errors='coerce')
+        condiciones = [
+            (temp['LATITUD'].isna()) | (temp['LONGITUD'].isna()),
+            (lat_n.isna()) & (temp['LATITUD'].notna()),
+            ~(lat_n.between(LAT_MIN, LAT_MAX)) | ~(lon_n.between(LON_MIN, LON_MAX))
+        ]
+        motivos = ["Coordenadas Nulas en Origen", "Formato de Coordenada Inválido", "Ubicación Fuera de Argentina"]
+        temp['MOTIVO_NO_LOCALIZADO'] = np.select(condiciones, motivos, default="Localizado")
+        return temp
+
+    # Creamos las bases con la columna extra
+    afi_descarga = etiquetar_errores(df_afi_clean)
+    cons_descarga = etiquetar_errores(df_cons_raw)
+
+    
+
     def filtrar_geo(df):
         df['LATITUD'] = pd.to_numeric(df['LATITUD'], errors='coerce')
         df['LONGITUD'] = pd.to_numeric(df['LONGITUD'], errors='coerce')
@@ -121,7 +142,7 @@ def cargar_y_procesar_datos():
     # Limpiamos columnas auxiliares
     data_final = data_final.drop(columns=['lat_cons', 'lon_cons'])
     
-    return data_final, df_afi_clean, df_cons_raw, df_mapa_afi, df_mapa_cons
+    return data_final, afi_descarga, cons_descarga, df_mapa_afi, df_mapa_cons
 
 
 # --- 3. INTERFAZ Y FILTROS ---
@@ -398,7 +419,7 @@ try:
         # Comparamos la base total vs los que sí entraron al mapa
         ids_en_mapa = afi_geo_all['AFI_ID'].unique()
         # Usamos df_afi_raw (retornado por tu función) para mantener el formato original
-        afi_no_encontrados = afi_base[~afi_base['AFI_ID'].isin(ids_en_mapa)]
+        afi_no_encontrados = afi_base[afi_base['MOTIVO_NO_LOCALIZADO'] != "Localizado"]
 
         with col1:
             st.write(f"**Afiliados no localizados:** {formato_miles(len(afi_no_encontrados))}")
@@ -413,7 +434,7 @@ try:
         # 2. Consultorios no encontrados
         # Comparamos por índice para ser precisos con los originales
         cons_en_mapa_idx = cons_geo_all.index
-        cons_no_encontrados = cons_base[~cons_base.index.isin(cons_en_mapa_idx)]
+        cons_no_encontrados = cons_base[cons_base['MOTIVO_NO_LOCALIZADO'] != "Localizado"]
 
         with col2:
             st.write(f"**Consultorios no localizados:** {formato_miles(len(cons_no_encontrados))}")
@@ -428,3 +449,4 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
