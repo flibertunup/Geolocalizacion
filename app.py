@@ -76,13 +76,35 @@ def cargar_y_procesar_datos():
     LON_MIN, LON_MAX = -74.0, -53.0
 
     def filtrar_geo(df):
-        df['LATITUD'] = pd.to_numeric(df['LATITUD'], errors='coerce')
-        df['LONGITUD'] = pd.to_numeric(df['LONGITUD'], errors='coerce')
-        mask = (df['LATITUD'].between(LAT_MIN, LAT_MAX)) & (df['LONGITUD'].between(LON_MIN, LON_MAX))
-        return df[mask].copy()
+        df = df.copy()
+        # Convertimos a numérico (los que no son números pasan a ser NaN)
+        lat_n = pd.to_numeric(df['LATITUD'], errors='coerce')
+        lon_n = pd.to_numeric(df['LONGITUD'], errors='coerce')
+        
+        # Definimos los 3 motivos solicitados
+        condiciones = [
+            (df['LATITUD'].isna()) | (df['LONGITUD'].isna()),
+            (lat_n.isna()) & (df['LATITUD'].notna()),
+            ~(lat_n.between(LAT_MIN, LAT_MAX)) | ~(lon_n.between(LON_MIN, LON_MAX))
+        ]
+        motivos = [
+            "Coordenadas Nulas en Origen",
+            "Formato de Coordenada Inválido",
+            "Ubicación Fuera de Argentina"
+        ]
+        
+        # Agregamos la columna de motivo
+        df['MOTIVO_NO_LOCALIZADO'] = np.select(condiciones, motivos, default="Localizado")
+        
+        # Para el mapa, solo devolvemos los "Localizado" con sus números reales
+        df_ok = df[df['MOTIVO_NO_LOCALIZADO'] == "Localizado"].copy()
+        df_ok['LATITUD'] = pd.to_numeric(df_ok['LATITUD'])
+        df_ok['LONGITUD'] = pd.to_numeric(df_ok['LONGITUD'])
+        return df, df_ok # Retornamos ambos: el base etiquetado y el limpio para el mapa
 
-    df_mapa_afi = filtrar_geo(df_afi_clean)
-    df_mapa_cons = filtrar_geo(df_cons_raw)
+    # Aplicamos la función ajustada
+    afi_base_etiquetada, df_mapa_afi = filtrar_geo(df_afi_clean)
+    cons_base_etiquetada, df_mapa_cons = filtrar_geo(df_cons_raw)
 
     # B. Cálculo de Distancias
     tree = cKDTree(df_mapa_cons[['LATITUD', 'LONGITUD']].values)
@@ -121,7 +143,7 @@ def cargar_y_procesar_datos():
     # Limpiamos columnas auxiliares
     data_final = data_final.drop(columns=['lat_cons', 'lon_cons'])
     
-    return data_final, df_afi_clean, df_cons_raw, df_mapa_afi, df_mapa_cons
+    return data_final, afi_base_etiquetada, cons_base_etiquetada, df_mapa_afi, df_mapa_cons
 
 
 # --- 3. INTERFAZ Y FILTROS ---
@@ -428,3 +450,4 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
