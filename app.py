@@ -33,7 +33,37 @@ st.set_page_config(page_title="Tablero de Cobertura Geográfica", layout="wide")
 
 
 
-# --- 1. FUNCIONES DE FORMATO ---
+# --- 1. FUNCIONES DE FORMATO Y LIMPIEZA ---
+
+def limpiar_coordenada_arg(valor):
+    """
+    Transforma formatos como -313.375.939 o -34295449 en coordenadas 
+    decimales válidas para Argentina (-31.3375939 o -34.295449).
+    """
+    if pd.isna(valor) or valor == "" or str(valor).strip() == "0":
+        return np.nan
+    
+    # Convertir a string, quitar puntos, comas y espacios
+    s = str(valor).replace('.', '').replace(',', '').strip()
+    
+    # Manejar el signo negativo
+    es_negativo = s.startswith('-')
+    s = s.replace('-', '')
+    
+    if len(s) < 4:
+        return np.nan
+    
+    # En Argentina las coordenadas tienen 2 dígitos enteros (del 21 al 74)
+    # Forzamos el punto decimal después del segundo dígito
+    limpio = f"{s[:2]}.{s[2:]}"
+    
+    try:
+        num = float(limpio)
+        # Forzamos que el resultado sea negativo (Argentina está en el Hemisferio Sur y Oeste)
+        return -num
+    except:
+        return np.nan
+        
 
 def formato_es(valor):
 
@@ -76,18 +106,21 @@ def cargar_y_procesar_datos():
     LON_MIN, LON_MAX = -74.0, -53.0
 
     def filtrar_geo(df):
-        df['LATITUD'] = pd.to_numeric(df['LATITUD'], errors='coerce')
-        df['LONGITUD'] = pd.to_numeric(df['LONGITUD'], errors='coerce')
-        mask = (df['LATITUD'].between(LAT_MIN, LAT_MAX)) & (df['LONGITUD'].between(LON_MIN, LON_MAX))
-        return df[mask].copy()
+        df = df.copy()
+        # Aplicamos la limpieza de coordenadas multi-formato
+        df['LATITUD'] = df['LATITUD'].apply(limpiar_coordenada_arg)
+        df['LONGITUD'] = df['LONGITUD'].apply(limpiar_coordenada_arg)
 
     df_mapa_afi = filtrar_geo(df_afi_clean)
     df_mapa_cons = filtrar_geo(df_cons_raw)
 
     # B. Cálculo de Distancias
-    tree = cKDTree(df_mapa_cons[['LATITUD', 'LONGITUD']].values)
-    dist, _ = tree.query(df_mapa_afi[['LATITUD', 'LONGITUD']].values, k=1)
-    df_mapa_afi['distancia_km'] = dist * 111.13 
+    if not df_mapa_cons.empty and not df_mapa_afi.empty:
+        tree = cKDTree(df_mapa_cons[['LATITUD', 'LONGITUD']].values)
+        dist, _ = tree.query(df_mapa_afi[['LATITUD', 'LONGITUD']].values, k=1)
+        df_mapa_afi['distancia_km'] = dist * 111.13 
+    else:
+        df_mapa_afi['distancia_km'] = np.nan
 
     # C. Agrupación
     resumen_afi = df_mapa_afi.groupby(['LOCALIDAD', 'PROVINCIA']).agg(
@@ -247,23 +280,12 @@ try:
 
     st.sidebar.write("**Afiliados**")
 
-    # MODIFICACIÓN MANUAL SEGÚN PEDIDO:
-    if prov_sel == "Todas":
-        val_total_afi_mostrar = "555.896"
-    else:
-        # Si filtra por provincia, dejamos el cálculo real de la base actual
-        val_total_afi_mostrar = formato_miles(afi_total_stats)
-        
-    st.sidebar.write(f"Total Base: {val_total_afi_mostrar}")
+    st.sidebar.write(f"Total Base: {formato_miles(afi_total_stats)}")
 
     st.sidebar.write(f"En Mapa: {formato_miles(afi_geo_stats)}")
 
-    # Calculamos el porcentaje basado en el número manual si es "Todas"
-    if prov_sel == "Todas":
-        perc_afi = (afi_geo_stats / 555896) * 100
-        st.sidebar.info(f"Éxito Geo: {perc_afi:.1f}".replace(".", ",") + " %")
-    else:
-        st.sidebar.info(f"Éxito Geo: {formato_porcentaje(afi_geo_stats, afi_total_stats)}")
+    st.sidebar.info(f"Éxito Geo: {formato_porcentaje(afi_geo_stats, afi_total_stats)}")
+
     
 
     st.sidebar.markdown("---")
@@ -274,22 +296,11 @@ try:
 
     st.sidebar.write("**Consultorios**")
 
-    # MODIFICACIÓN MANUAL SEGÚN PEDIDO:
-    if prov_sel == "Todas":
-        val_total_cons_mostrar = "116.587"
-    else:
-        val_total_cons_mostrar = formato_miles(cons_total_stats)
-        
-    st.sidebar.write(f"Total Base: {val_total_cons_mostrar}")
+    st.sidebar.write(f"Total Base: {formato_miles(cons_total_stats)}")
 
     st.sidebar.write(f"En Mapa: {formato_miles(cons_geo_stats)}")
 
-    # Calculamos el porcentaje basado en el número manual si es "Todas"
-    if prov_sel == "Todas":
-        perc_cons = (cons_geo_stats / 116587) * 100
-        st.sidebar.success(f"Éxito Geo: {perc_cons:.1f}".replace(".", ",") + " %")
-    else:
-        st.sidebar.success(f"Éxito Geo: {formato_porcentaje(cons_geo_stats, cons_total_stats)}")
+    st.sidebar.success(f"Éxito Geo: {formato_porcentaje(cons_geo_stats, cons_total_stats)}")
 
 
 
@@ -450,20 +461,4 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
