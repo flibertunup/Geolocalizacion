@@ -417,8 +417,8 @@ try:
 
         # 1. Afiliados no encontrados
         # Comparamos la base total vs los que sí entraron al mapa
-        ids_en_mapa = afi_geo_all['AFI_ID'].unique()
-        # Usamos df_afi_raw (retornado por tu función) para mantener el formato original
+        # ids_en_mapa = afi_geo_all['AFI_ID'].unique()
+       
         afi_no_encontrados = afi_base[afi_base['MOTIVO_NO_LOCALIZADO'] != "Localizado"]
 
         with col1:
@@ -433,7 +433,7 @@ try:
 
         # 2. Consultorios no encontrados
         # Comparamos por índice para ser precisos con los originales
-        cons_en_mapa_idx = cons_geo_all.index
+        # cons_en_mapa_idx = cons_geo_all.index
         cons_no_encontrados = cons_base[cons_base['MOTIVO_NO_LOCALIZADO'] != "Localizado"]
 
         with col2:
@@ -449,4 +449,5 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
