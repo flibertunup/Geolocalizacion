@@ -107,13 +107,20 @@ def cargar_y_procesar_datos():
 
     def filtrar_geo(df):
         df = df.copy()
-        # Aplicamos la limpieza de coordenadas multi-formato
+        # 1. Limpiamos los formatos raros (-313.375... -> -31.33)
         df['LATITUD'] = df['LATITUD'].apply(limpiar_coordenada_arg)
         df['LONGITUD'] = df['LONGITUD'].apply(limpiar_coordenada_arg)
         
+        # 2. Eliminamos los que no pudieron ser limpiados (NaN)
+        df = df.dropna(subset=['LATITUD', 'LONGITUD'])
+        
+        # 3. FILTRO CRÍTICO: Solo lo que está dentro de Argentina
+        # Si un dato limpio da -3.4 (fuera de rango), se elimina aquí
         mask = (df['LATITUD'].between(LAT_MIN, LAT_MAX)) & (df['LONGITUD'].between(LON_MIN, LON_MAX))
-        return df[mask].copy()
+        
+        return df[mask].copy() # <--- IMPORTANTE: Devolver el DF filtrado
 
+    # Aplicamos a ambas bases
     df_mapa_afi = filtrar_geo(df_afi_clean)
     df_mapa_cons = filtrar_geo(df_cons_raw)
 
@@ -464,5 +471,6 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
 
