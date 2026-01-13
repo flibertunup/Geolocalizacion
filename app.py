@@ -36,31 +36,28 @@ st.set_page_config(page_title="Tablero de Cobertura Geográfica", layout="wide")
 # --- 1. FUNCIONES DE FORMATO Y LIMPIEZA ---
 
 def limpiar_coordenada_arg(valor):
-    """
-    Transforma formatos como -313.375.939 o -34295449 en coordenadas 
-    decimales válidas para Argentina (-31.3375939 o -34.295449).
-    """
     if pd.isna(valor) or valor == "" or str(valor).strip() == "0":
         return np.nan
     
-    # Convertir a string, quitar puntos, comas y espacios
+    # 1. Limpieza total de caracteres no numéricos excepto el guion
     s = str(valor).replace('.', '').replace(',', '').strip()
     
-    # Manejar el signo negativo
-    es_negativo = s.startswith('-')
-    s = s.replace('-', '')
+    # 2. Extraer solo los números
+    solo_numeros = "".join(filter(str.isdigit, s))
     
-    if len(s) < 4:
+    if len(solo_numeros) < 4:
         return np.nan
     
-    # En Argentina las coordenadas tienen 2 dígitos enteros (del 21 al 74)
-    # Forzamos el punto decimal después del segundo dígito
-    limpio = f"{s[:2]}.{s[2:]}"
+    # 3. Formatear: Tomamos los primeros 2 dígitos como enteros y el resto decimal
+    # Ejemplo: 313375939 -> 31.3375939
+    limpio = f"{solo_numeros[:2]}.{solo_numeros[2:]}"
     
     try:
         num = float(limpio)
-        # Forzamos que el resultado sea negativo (Argentina está en el Hemisferio Sur y Oeste)
-        return -num
+        # 4. Forzamos rango lógico de Argentina (Lat/Lon siempre negativas entre 21 y 74)
+        if 20 <= num <= 75:
+            return -num
+        return np.nan
     except:
         return np.nan
         
@@ -471,6 +468,7 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
 
 
