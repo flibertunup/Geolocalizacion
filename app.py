@@ -110,6 +110,9 @@ def cargar_y_procesar_datos():
         # Aplicamos la limpieza de coordenadas multi-formato
         df['LATITUD'] = df['LATITUD'].apply(limpiar_coordenada_arg)
         df['LONGITUD'] = df['LONGITUD'].apply(limpiar_coordenada_arg)
+        
+        mask = (df['LATITUD'].between(LAT_MIN, LAT_MAX)) & (df['LONGITUD'].between(LON_MIN, LON_MAX))
+        return df[mask].copy()
 
     df_mapa_afi = filtrar_geo(df_afi_clean)
     df_mapa_cons = filtrar_geo(df_cons_raw)
@@ -461,4 +464,5 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
