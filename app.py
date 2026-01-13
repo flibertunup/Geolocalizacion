@@ -33,34 +33,7 @@ st.set_page_config(page_title="Tablero de Cobertura Geográfica", layout="wide")
 
 
 
-# --- 1. FUNCIONES DE FORMATO Y LIMPIEZA ---
-
-def limpiar_coordenada_arg(valor):
-    if pd.isna(valor) or valor == "" or str(valor).strip() == "0":
-        return np.nan
-    
-    # 1. Limpieza total de caracteres no numéricos excepto el guion
-    s = str(valor).replace('.', '').replace(',', '').strip()
-    
-    # 2. Extraer solo los números
-    solo_numeros = "".join(filter(str.isdigit, s))
-    
-    if len(solo_numeros) < 4:
-        return np.nan
-    
-    # 3. Formatear: Tomamos los primeros 2 dígitos como enteros y el resto decimal
-    # Ejemplo: 313375939 -> 31.3375939
-    limpio = f"{solo_numeros[:2]}.{solo_numeros[2:]}"
-    
-    try:
-        num = float(limpio)
-        # 4. Forzamos rango lógico de Argentina (Lat/Lon siempre negativas entre 21 y 74)
-        if 20 <= num <= 75:
-            return -num
-        return np.nan
-    except:
-        return np.nan
-        
+# --- 1. FUNCIONES DE FORMATO ---
 
 def formato_es(valor):
 
@@ -103,54 +76,33 @@ def cargar_y_procesar_datos():
     LON_MIN, LON_MAX = -74.0, -53.0
 
     def filtrar_geo(df):
-        df = df.copy()
-        # 1. Limpiamos los formatos raros (-313.375... -> -31.33)
-        df['LATITUD'] = df['LATITUD'].apply(limpiar_coordenada_arg)
-        df['LONGITUD'] = df['LONGITUD'].apply(limpiar_coordenada_arg)
-        
-        # 2. Eliminamos los que no pudieron ser limpiados (NaN)
-        df = df.dropna(subset=['LATITUD', 'LONGITUD'])
-        
-        # 3. FILTRO CRÍTICO: Solo lo que está dentro de Argentina
-        # Si un dato limpio da -3.4 (fuera de rango), se elimina aquí
+        df['LATITUD'] = pd.to_numeric(df['LATITUD'], errors='coerce')
+        df['LONGITUD'] = pd.to_numeric(df['LONGITUD'], errors='coerce')
         mask = (df['LATITUD'].between(LAT_MIN, LAT_MAX)) & (df['LONGITUD'].between(LON_MIN, LON_MAX))
-        
-        return df[mask].copy() # <--- IMPORTANTE: Devolver el DF filtrado
+        return df[mask].copy()
 
-    # Aplicamos a ambas bases
     df_mapa_afi = filtrar_geo(df_afi_clean)
     df_mapa_cons = filtrar_geo(df_cons_raw)
 
     # B. Cálculo de Distancias
-    if not df_mapa_cons.empty and not df_mapa_afi.empty:
-        tree = cKDTree(df_mapa_cons[['LATITUD', 'LONGITUD']].values)
-        dist, _ = tree.query(df_mapa_afi[['LATITUD', 'LONGITUD']].values, k=1)
-        df_mapa_afi['distancia_km'] = dist * 111.13 
-    else:
-        df_mapa_afi['distancia_km'] = np.nan
+    tree = cKDTree(df_mapa_cons[['LATITUD', 'LONGITUD']].values)
+    dist, _ = tree.query(df_mapa_afi[['LATITUD', 'LONGITUD']].values, k=1)
+    df_mapa_afi['distancia_km'] = dist * 111.13 
 
-   # C. Lógica de Etiquetado para Auditoría
-    def procesar_y_etiquetar_geo(df):
-        df = df.copy()
-        df['LAT_CLEAN'] = df['LATITUD'].apply(limpiar_coordenada_arg)
-        df['LON_CLEAN'] = df['LONGITUD'].apply(limpiar_coordenada_arg)
-        
-        condiciones = [
-            (df['LATITUD'].isna()) | (df['LONGITUD'].isna()),
-            (df['LAT_CLEAN'].isna()) | (df['LON_CLEAN'].isna()),
-            ~((df['LAT_CLEAN'].between(LAT_MIN, LAT_MAX)) & (df['LON_CLEAN'].between(LON_MIN, LON_MAX)))
-        ]
-        motivos = ["Coordenadas Nulas", "Formato Inválido", "Fuera de Argentina"]
-        
-        df['MOTIVO_NO_LOCALIZADO'] = np.select(condiciones, motivos, default="Localizado correctamente")
-        df['LATITUD'], df['LONGITUD'] = df['LAT_CLEAN'], df['LON_CLEAN']
-        return df
+    # C. Agrupación
+    resumen_afi = df_mapa_afi.groupby(['LOCALIDAD', 'PROVINCIA']).agg(
+        cant_afiliados=('AFI_ID', 'nunique'),
+        dist_media=('distancia_km', 'mean'),
+        lat_ref=('LATITUD', 'mean'), 
+        lon_ref=('LONGITUD', 'mean')
+    ).reset_index()
 
-    afi_proc = procesar_y_etiquetar_geo(df_afi_clean)
-    cons_proc = procesar_y_etiquetar_geo(df_cons_raw)
-
-    df_mapa_afi = afi_proc[afi_proc['MOTIVO_NO_LOCALIZADO'] == "Localizado correctamente"].copy()
-    df_mapa_cons = cons_proc[cons_proc['MOTIVO_NO_LOCALIZADO'] == "Localizado correctamente"].copy()
+    # Agrupamos consultorios y obtenemos sus coordenadas promedio también
+    resumen_cons = df_mapa_cons.groupby(['LOCALIDAD', 'PROVINCIA']).agg(
+        cant_consultorios=('LOCALIDAD', 'size'),
+        lat_cons=('LATITUD', 'mean'),
+        lon_cons=('LONGITUD', 'mean')
+    ).reset_index()
 
     # D. USAMOS MERGE OUTER PARA MOSTRAR TAMBIÉN LOCALIDADES CON CONSULTORIOS SIN AFILIADOS.
     # Esto asegura que si hay consultorios en una ciudad sin afiliados, la ciudad NO desaparezca.
@@ -169,7 +121,7 @@ def cargar_y_procesar_datos():
     # Limpiamos columnas auxiliares
     data_final = data_final.drop(columns=['lat_cons', 'lon_cons'])
     
-    return data_final.drop(columns=['lat_cons', 'lon_cons']), afi_proc, cons_proc, df_mapa_afi, df_mapa_cons
+    return data_final, df_afi_clean, df_cons_raw, df_mapa_afi, df_mapa_cons
 
 
 # --- 3. INTERFAZ Y FILTROS ---
@@ -446,7 +398,7 @@ try:
         # Comparamos la base total vs los que sí entraron al mapa
         ids_en_mapa = afi_geo_all['AFI_ID'].unique()
         # Usamos df_afi_raw (retornado por tu función) para mantener el formato original
-        afi_no_encontrados = afi_base[afi_base['MOTIVO_NO_LOCALIZADO'] != "Localizado correctamente"]
+        afi_no_encontrados = afi_base[~afi_base['AFI_ID'].isin(ids_en_mapa)]
 
         with col1:
             st.write(f"**Afiliados no localizados:** {formato_miles(len(afi_no_encontrados))}")
@@ -461,7 +413,7 @@ try:
         # 2. Consultorios no encontrados
         # Comparamos por índice para ser precisos con los originales
         cons_en_mapa_idx = cons_geo_all.index
-        cons_no_encontrados = cons_base[cons_base['MOTIVO_NO_LOCALIZADO'] != "Localizado correctamente"]
+        cons_no_encontrados = cons_base[~cons_base.index.isin(cons_en_mapa_idx)]
 
         with col2:
             st.write(f"**Consultorios no localizados:** {formato_miles(len(cons_no_encontrados))}")
@@ -476,8 +428,3 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
-
-
-
-
-
