@@ -391,6 +391,39 @@ try:
         st.markdown("---")
         st.subheader("🛠️ Descargas de Auditoría (Registros no localizados)")
         st.info("Estos archivos contienen los registros originales que no pudieron ser ubicados en el mapa por errores de coordenadas o país.")
+
+        # Función local para asignar motivos sin tocar la lógica de arriba
+        def asignar_motivo_error(df_total, df_exito):
+            # Identificamos los que NO están en el DF de éxito
+            if 'AFI_ID' in df_total.columns:
+                no_localizados = df_total[~df_total['AFI_ID'].isin(df_exito['AFI_ID'])].copy()
+            else:
+                no_localizados = df_total[~df_total.index.isin(df_exito.index)].copy()
+            
+            def definir_motivo(row):
+                # 1. Chequeo de Nulos
+                if pd.isna(row['LATITUD']) or pd.isna(row['LONGITUD']):
+                    return "Coordenadas Nulas en Origen"
+                
+                # 2. Chequeo de Formato
+                try:
+                    lat, lon = float(row['LATITUD']), float(row['LONGITUD'])
+                except:
+                    return "Formato de Coordenada Inválido"
+                
+                # 3. Chequeo de País (especial para consultorios)
+                if 'PAIS' in row and row['PAIS'] != 'ARGENTINA':
+                    return "Ubicación Fuera de Argentina"
+                
+                # 4. Chequeo de Rango Geográfico
+                if not (-56.0 <= lat <= -21.0 and -74.0 <= lon <= -53.0):
+                    return "Ubicación Fuera de Argentina"
+                
+                return "Error Desconocido"
+
+            no_localizados['MOTIVO_NO_LOCALIZADO'] = no_localizados.apply(definir_motivo, axis=1)
+            return no_localizados
+
         
         col1, col2 = st.columns(2)
 
@@ -401,6 +434,7 @@ try:
         afi_no_encontrados = afi_base[~afi_base['AFI_ID'].isin(ids_en_mapa)]
 
         with col1:
+            afi_no_encontrados = asignar_motivo_error(afi_base, afi_geo_all)
             st.write(f"**Afiliados no localizados:** {formato_miles(len(afi_no_encontrados))}")
             btn_afi = st.download_button(
                 label="📥 Descargar Afiliados No Localizados",
@@ -416,6 +450,7 @@ try:
         cons_no_encontrados = cons_base[~cons_base.index.isin(cons_en_mapa_idx)]
 
         with col2:
+            cons_no_encontrados = asignar_motivo_error(cons_base, cons_geo_all)
             st.write(f"**Consultorios no localizados:** {formato_miles(len(cons_no_encontrados))}")
             btn_cons = st.download_button(
                 label="📥 Descargar Consultorios No Localizados",
@@ -428,3 +463,4 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
