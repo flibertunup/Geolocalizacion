@@ -105,6 +105,10 @@ def cargar_y_procesar_datos():
     df_mapa_afi = filtrar_geo(df_afi_clean)
     df_mapa_cons = filtrar_geo(df_cons_raw)
 
+    print(f"DEBUG: Afiliados originales: {len(df_afi_clean)}")
+    print(f"DEBUG: Afiliados tras filtrar_geo: {len(df_mapa_afi)}")
+    print(f"DEBUG: Consultorios tras filtrar_geo: {len(df_mapa_cons)}")
+    
     # B. Cálculo de Distancias
     tree = cKDTree(df_mapa_cons[['LATITUD', 'LONGITUD']].values)
     dist, _ = tree.query(df_mapa_afi[['LATITUD', 'LONGITUD']].values, k=1)
@@ -454,4 +458,5 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
