@@ -75,27 +75,6 @@ def cargar_y_procesar_datos():
     LAT_MIN, LAT_MAX = -56.0, -21.0
     LON_MIN, LON_MAX = -74.0, -53.0
 
-
-    # --- NUEVA LÓGICA DE ETIQUETADO (Solo para descargas) ---
-    def crear_archivo_auditoria(df):
-        temp = df.copy()
-        lat_n = pd.to_numeric(temp['LATITUD'], errors='coerce')
-        lon_n = pd.to_numeric(temp['LONGITUD'], errors='coerce')
-        
-        condiciones = [
-            (temp['LATITUD'].isna()) | (temp['LONGITUD'].isna()),
-            (lat_n.isna()) & (temp['LATITUD'].notna()),
-            ~(lat_n.between(LAT_MIN, LAT_MAX)) | ~(lon_n.between(LON_MIN, LON_MAX))
-        ]
-        motivos = ["Coordenadas Nulas en Origen", "Formato de Coordenada Inválido", "Ubicación Fuera de Argentina"]
-        temp['MOTIVO_NO_LOCALIZADO'] = np.select(condiciones, motivos, default="Localizado")
-        return temp[temp['MOTIVO_NO_LOCALIZADO'] != "Localizado"]
-
-    # Generamos los archivos de error aparte
-    afi_errores = crear_archivo_auditoria(df_afi_clean)
-    cons_errores = crear_archivo_auditoria(df_cons_raw)
-    
-
     def filtrar_geo(df):
         df['LATITUD'] = pd.to_numeric(df['LATITUD'], errors='coerce')
         df['LONGITUD'] = pd.to_numeric(df['LONGITUD'], errors='coerce')
@@ -142,7 +121,7 @@ def cargar_y_procesar_datos():
     # Limpiamos columnas auxiliares
     data_final = data_final.drop(columns=['lat_cons', 'lon_cons'])
     
-    return data_final, afi_errores, cons_errores, df_mapa_afi, df_mapa_cons
+    return data_final, df_afi_clean, df_cons_raw, df_mapa_afi, df_mapa_cons
 
 
 # --- 3. INTERFAZ Y FILTROS ---
