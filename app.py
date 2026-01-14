@@ -59,10 +59,42 @@ def formato_miles(valor):
 
 # --- 2. PROCESAMIENTO DE DATOS ---
 
-@st.cache_data
 def cargar_y_procesar_datos():
-    # Carga de archivos
-    df_afi_raw = pd.read_csv('Afiliados interior geolocalizacion.csv')
+    # --- CONEXIÓN Y CARGA SQL ---
+    query_afiliados = """
+    SELECT  
+        af.afi_id        AS "AFI_ID",
+        da.calle         AS "CALLE",
+        da.numero        AS "NUMERO",
+        NVL (
+             (SELECT loc.localidad FROM sa_domicilios_afiliado dafi, sa_domiafi_td datd, sa_localidades loc
+              WHERE dafi.afi_afi_id = af.afi_id AND dafi.domiafi_id = datd.domiafi_domiafi_id AND loc.loc_id = dafi.loc_loc_id AND datd.td_codigo = 'POST' AND ROWNUM < 2),
+             (SELECT loc.localidad FROM sa_domicilios_afiliado dafi, sa_domiafi_td datd, sa_localidades loc
+              WHERE dafi.afi_afi_id = af.afi_afi_id AND dafi.domiafi_id = datd.domiafi_domiafi_id AND loc.loc_id = dafi.loc_loc_id AND datd.td_codigo = 'POST' AND ROWNUM < 2))
+                 AS LOCALIDAD,
+        NVL (
+             (SELECT loc.pcia_codigo FROM sa_domicilios_afiliado dafi, sa_domiafi_td datd, sa_localidades loc
+              WHERE dafi.afi_afi_id = af.afi_id AND dafi.domiafi_id = datd.domiafi_domiafi_id AND loc.loc_id = dafi.loc_loc_id AND datd.td_codigo = 'POST' AND ROWNUM < 2),
+             (SELECT loc.pcia_codigo FROM sa_domicilios_afiliado dafi, sa_domiafi_td datd, sa_localidades loc
+              WHERE dafi.afi_afi_id = af.afi_afi_id AND dafi.domiafi_id = datd.domiafi_domiafi_id AND loc.loc_id = dafi.loc_loc_id AND datd.td_codigo = 'POST' AND ROWNUM < 2))
+                 AS PROVINCIA,
+        da.latitud       AS "LATITUD",
+        da.longitud      AS "LONGITUD"
+    FROM sa_afiliados af
+    LEFT JOIN sa_domicilios_afiliado da
+           ON da.afi_afi_id = af.afi_id
+    WHERE af.estado = 'A'
+    """
+    
+    try:
+        conn = conectar_db()
+        df_afi_raw = pd.read_sql(query_afiliados, conn)
+        # conn.close() # Opcional si usas cache_resource
+    except Exception as e:
+        st.error(f"Error al conectar con la base de datos: {e}")
+        return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
+    
+    # Carga de consultorios
     df_cons_raw = pd.read_csv('Consultorios GeoLocalizacion (1).csv')
 
     # FILTRO POR PAÍS
@@ -428,3 +460,4 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
