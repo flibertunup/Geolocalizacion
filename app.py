@@ -64,33 +64,45 @@ def cargar_y_procesar_datos():
     query_afiliados = """
     SELECT  
         af.afi_id        AS "AFI_ID",
-        da.calle         AS "CALLE",
-        da.numero        AS "NUMERO",
+        COALESCE(
+             (SELECT dafi.calle FROM sa_domicilios_afiliado dafi, sa_domiafi_td datd
+              WHERE dafi.afi_afi_id = af.afi_id AND dafi.domiafi_id = datd.domiafi_domiafi_id AND datd.td_codigo = 'POST' LIMIT 1),
+             (SELECT dafi.calle FROM sa_domicilios_afiliado dafi, sa_domiafi_td datd
+              WHERE dafi.afi_afi_id = af.afi_id AND dafi.domiafi_id = datd.domiafi_domiafi_id AND datd.td_codigo = 'POST' LIMIT 1)
+        ) AS "CALLE",
+        COALESCE(
+             (SELECT dafi.NUMERO FROM sa_domicilios_afiliado dafi, sa_domiafi_td datd
+              WHERE dafi.afi_afi_id = af.afi_id AND dafi.domiafi_id = datd.domiafi_domiafi_id AND datd.td_codigo = 'POST' LIMIT 1),
+             (SELECT dafi.NUMERO FROM sa_domicilios_afiliado dafi, sa_domiafi_td datd
+              WHERE dafi.afi_afi_id = af.afi_id AND dafi.domiafi_id = datd.domiafi_domiafi_id AND datd.td_codigo = 'POST' LIMIT 1)
+        ) AS "NUMERO",
         COALESCE (
-             (SELECT loc.localidad FROM sa_domicilios_afiliado dafi
-              JOIN sa_domiafi_td datd ON dafi.domiafi_id = datd.domiafi_domiafi_id
-              JOIN sa_localidades loc ON loc.loc_id = dafi.loc_loc_id
-              WHERE dafi.afi_afi_id = af.afi_id AND datd.td_codigo = 'POST' LIMIT 1),
-             (SELECT loc.localidad FROM sa_domicilios_afiliado dafi
-              JOIN sa_domiafi_td datd ON dafi.domiafi_id = datd.domiafi_domiafi_id
-              JOIN sa_localidades loc ON loc.loc_id = dafi.loc_loc_id
-              WHERE dafi.afi_afi_id = af.afi_id AND datd.td_codigo = 'POST' LIMIT 1))
-                 AS "LOCALIDAD",
+             (SELECT loc.localidad FROM sa_domicilios_afiliado dafi, sa_domiafi_td datd, sa_localidades loc
+              WHERE dafi.afi_afi_id = af.afi_id AND dafi.domiafi_id = datd.domiafi_domiafi_id AND loc.loc_id = dafi.loc_loc_id AND datd.td_codigo = 'POST' LIMIT 1),
+             (SELECT loc.localidad FROM sa_domicilios_afiliado dafi, sa_domiafi_td datd, sa_localidades loc
+              WHERE dafi.afi_afi_id = af.afi_id AND dafi.domiafi_id = datd.domiafi_domiafi_id AND loc.loc_id = dafi.loc_loc_id AND datd.td_codigo = 'POST' LIMIT 1)
+        ) AS "LOCALIDAD",
         COALESCE (
-             (SELECT loc.pcia_codigo FROM sa_domicilios_afiliado dafi
-              JOIN sa_domiafi_td datd ON dafi.domiafi_id = datd.domiafi_domiafi_id
-              JOIN sa_localidades loc ON loc.loc_id = dafi.loc_loc_id
-              WHERE dafi.afi_afi_id = af.afi_id AND datd.td_codigo = 'POST' LIMIT 1),
-             (SELECT loc.pcia_codigo FROM sa_domicilios_afiliado dafi
-              JOIN sa_domiafi_td datd ON dafi.domiafi_id = datd.domiafi_domiafi_id
-              JOIN sa_localidades loc ON loc.loc_id = dafi.loc_loc_id
-              WHERE dafi.afi_afi_id = af.afi_id AND datd.td_codigo = 'POST' LIMIT 1))
-                 AS "PROVINCIA",
-        da.latitud       AS "LATITUD",
-        da.longitud      AS "LONGITUD"
+             (SELECT p.NOMBRE FROM sa_domicilios_afiliado dafi, sa_domiafi_td datd, sa_localidades loc, sa_provincias p
+              WHERE dafi.afi_afi_id = af.afi_id AND dafi.domiafi_id = datd.domiafi_domiafi_id AND loc.loc_id = dafi.loc_loc_id AND datd.td_codigo = 'POST' 
+              AND p.codigo = loc.PCIA_CODIGO LIMIT 1),
+             (SELECT p.NOMBRE FROM sa_domicilios_afiliado dafi, sa_domiafi_td datd, sa_localidades loc, sa_provincias p
+              WHERE dafi.afi_afi_id = af.afi_id AND dafi.domiafi_id = datd.domiafi_domiafi_id AND loc.loc_id = dafi.loc_loc_id AND datd.td_codigo = 'POST' 
+              AND p.codigo = loc.PCIA_CODIGO LIMIT 1)
+        ) AS "PROVINCIA",   
+        COALESCE(
+             (SELECT dafi.latitud FROM sa_domicilios_afiliado dafi, sa_domiafi_td datd
+              WHERE dafi.afi_afi_id = af.afi_id AND dafi.domiafi_id = datd.domiafi_domiafi_id AND datd.td_codigo = 'POST' LIMIT 1),
+             (SELECT dafi.latitud FROM sa_domicilios_afiliado dafi, sa_domiafi_td datd
+              WHERE dafi.afi_afi_id = af.afi_id AND dafi.domiafi_id = datd.domiafi_domiafi_id AND datd.td_codigo = 'POST' LIMIT 1)
+        ) AS "LATITUD",
+        COALESCE(
+             (SELECT dafi.longitud FROM sa_domicilios_afiliado dafi, sa_domiafi_td datd
+              WHERE dafi.afi_afi_id = af.afi_id AND dafi.domiafi_id = datd.domiafi_domiafi_id AND datd.td_codigo = 'POST' LIMIT 1),
+             (SELECT dafi.longitud FROM sa_domicilios_afiliado dafi, sa_domiafi_td datd
+              WHERE dafi.afi_afi_id = af.afi_id AND dafi.domiafi_id = datd.domiafi_domiafi_id AND datd.td_codigo = 'POST' LIMIT 1)
+        ) AS "LONGITUD"     
     FROM sa_afiliados af
-    LEFT JOIN sa_domicilios_afiliado da
-           ON da.afi_afi_id = af.afi_id
     WHERE af.estado = 'A'
     """
     
@@ -468,5 +480,6 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
 
