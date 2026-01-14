@@ -147,17 +147,61 @@ def cargar_y_procesar_datos():
     WHERE af."estado" = 'A'
     ORDER BY af."apellidos", af."nombres";  
     """
+    # Query de Consultorios (Convertida de Oracle a Postgres)
+    query_consultorios = """
+    SELECT 
+        c."PRES_EFE_CODIGO", c."SECUENCIA", c."USERNAME", c."NOMBRE",
+        d."domicons_id", d."calle", d."numero", d."piso", d."dpto",
+        SUBSTRING(l."CODIGO_POSTAL" FROM 1 FOR 4) AS "CODIGO_POSTAL",
+        d."BARRIO", l."localidad" AS "LOCALIDAD", pr."NOMBRE" AS "PROVINCIA", pa."NOMBRE" AS "PAIS",
+        d."LATITUD", d."longitud" AS "LONGITUD", d."OBSERVACIONES",
+        COALESCE(esp."COD_ESP", 'Sin Dato') AS "COD_ESP",
+        COALESCE(esp."ESPECIALIDAD", 'Sin Dato') AS "ESPECIALIDAD",
+        p."AGPRES_CODIGO" AS "AGRUPACION_PRESTADOR",
+        ap."NOMBRE" AS "DESC_AGRUP_PRESTADOR",
+        e."CE_CODIGO" AS "CLASE_EFECTOR",
+        cle."NOMBRE" AS "DESC_CLASE_EFECTOR",
+        e."AGEFE_CODIGO" AS "AGRUPACION_EFECTOR",
+        age."NOMBRE" AS "DESC_AGRUPACION_EFECTOR",
+        e."VDA_DRV_TIPO_EFECTOR" AS "TIPO_EFECTOR",
+        lv."NOMBRE" AS "DESC_TIPO_EFECTOR",
+        e."CATEFE_CODIGO" AS "CATEGORIA_EFECTOR",
+        ce."NOMBRE" AS "DESC_CATEGORIA_EFECTOR",
+        p."estado" AS "ESTADOPREST", c."estado" AS "ESTADOCONS", e."estado" AS "ESTADOEFECTOR"
+    FROM "SA_CONSULTORIOS" c
+    JOIN "SA_DOMICILIOS_CONSULTORIO" d ON d."CONS_PRES_EFE_CODIGO" = c."PRES_EFE_CODIGO" AND d."CONS_SECUENCIA" = c."SECUENCIA"
+    JOIN "SA_LOCALIDADES" l ON d."loc_loc_id" = l."loc_id"
+    JOIN "SA_PROVINCIAS" pr ON l."PCIA_CODIGO" = pr."CODIGO"
+    JOIN "SA_PAISES" pa ON pr."PAIS_CODIGO" = pa."CODIGO"
+    JOIN "SA_PRESTADORES" p ON c."PRES_EFE_CODIGO" = p."EFE_CODIGO"
+    JOIN "SA_EFECTORES" e ON e."codigo" = p."efe_codigo"
+    LEFT JOIN "SA_AGRUPACIONES_EFECTORES" age ON e."AGEFE_CODIGO" = age."CODIGO"
+    LEFT JOIN "SA_CATEGORIAS_EFECTOR" ce ON e."CATEFE_CODIGO" = ce."CODIGO"
+    LEFT JOIN "SA_CLASES_EFECTOR" cle ON e."CE_CODIGO" = cle."CODIGO"
+    LEFT JOIN "LIBRERIA"."LIB_VALORES_DOMINIO_APP" lv ON e."VDA_DRV_TIPO_EFECTOR" = lv."DRV"
+    LEFT JOIN "SA_AGRUPACIONES_PRESTADORES" ap ON p."AGPRES_CODIGO" = ap."CODIGO"
+    LEFT JOIN (
+        SELECT ep."CODIGO" AS "COD_ESP", ep."NOMBRE" AS "ESPECIALIDAD", epf."EFE_CODIGO"
+        FROM "SA_ESPECIALIDADES" ep
+        JOIN "SA_ESP_PROF" epf ON ep."CODIGO" = epf."ESP_CODIGO"
+    ) esp ON c."PRES_EFE_CODIGO" = esp."EFE_CODIGO"
+    WHERE c."ESTADO" = 'A' AND p."estado" = 'A' AND e."estado" = 'A'
+    ORDER BY 1, 2
+    """  
     
     try:
         conn = conectar_db()
         df_afi_raw = pd.read_sql(query_afiliados, conn)
-        # conn.close() # Opcional si usas cache_resource
+        df_cons_raw = pd.read_sql(query_consultorios, conn)
+        # conn.close() # Opcional
     except Exception as e:
         st.error(f"Error al conectar con la base de datos: {e}")
         return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
-    
-    # Carga de consultorios
-    df_cons_raw = pd.read_csv('Consultorios GeoLocalizacion (1).csv')
+
+    # Aseguramos que los nombres de columnas de consultorios coincidan con el resto del script
+    # (Pasamos a mayúsculas para evitar errores de case-sensitivity en Python)
+    df_cons_raw.columns = [c.upper() for c in df_cons_raw.columns]
+    df_afi_raw.columns = [c.upper() for c in df_afi_raw.columns]
 
     # FILTRO POR PAÍS
     df_cons_raw = df_cons_raw[df_cons_raw['PAIS'] == 'ARGENTINA']
@@ -522,6 +566,7 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
 
 
