@@ -75,6 +75,13 @@ def cargar_y_procesar_datos():
     df_afi_raw = pd.concat(lista_df, ignore_index=True)
 
     df_afi_raw.columns = df_afi_raw.columns.str.upper().str.strip()
+
+    # Convertir a string, quitar puntos extra (excepto el primero) y pasar a numérico
+    df_afi_raw['LATITUD'] = pd.to_numeric(df_afi_raw['LATITUD'].astype(str).str.replace('.', '', regex=False).str.replace(r'^(\-\d{2})', r'\1.', regex=True), errors='coerce')
+    df_afi_raw['LONGITUD'] = pd.to_numeric(df_afi_raw['LONGITUD'].astype(str).str.replace('.', '', regex=False).str.replace(r'^(\-\d{2})', r'\1.', regex=True), errors='coerce')
+
+    # Eliminar filas que se quedaron sin coordenadas válidas
+    df_afi_raw = df_afi_raw.dropna(subset=['LATITUD', 'LONGITUD'])
     
     df_cons_raw = pd.read_csv('Consultorios GeoLocalizacion (1).csv')
 
@@ -457,6 +464,7 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
 
 
