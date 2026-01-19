@@ -73,6 +73,8 @@ def cargar_y_procesar_datos():
     # Leemos cada archivo y los concatenamos en uno solo
     lista_df = [pd.read_csv(f) for f in archivos_afi]
     df_afi_raw = pd.concat(lista_df, ignore_index=True)
+
+    df_afi_raw.columns = df_afi_raw.columns.str.upper().str.strip()
     
     df_cons_raw = pd.read_csv('Consultorios GeoLocalizacion (1).csv')
 
@@ -439,4 +441,5 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
