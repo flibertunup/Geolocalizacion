@@ -62,7 +62,18 @@ def formato_miles(valor):
 @st.cache_data
 def cargar_y_procesar_datos():
     # Carga de archivos
-    df_afi_raw = pd.read_csv('Afiliados interior geolocalizacion.csv')
+
+    archivos_afi = [
+        'afiliados_parte_1.csv', 
+        'afiliados_parte_2.csv', 
+        'afiliados_parte_3.csv', 
+        'afiliados_parte_4.csv'
+    ]
+
+    # Leemos cada archivo y los concatenamos en uno solo
+    lista_df = [pd.read_csv(f) for f in archivos_afi]
+    df_afi_raw = pd.concat(lista_df, ignore_index=True)
+    
     df_cons_raw = pd.read_csv('Consultorios GeoLocalizacion (1).csv')
 
     # FILTRO POR PAÍS
@@ -428,3 +439,4 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
