@@ -226,7 +226,7 @@ try:
 
 
 
-    max_dist_data = float(data_mapa_raw['dist_media'].dropna().max())
+    max_dist_data = float(data_mapa_raw['dist_media'].dropna().max()) if not data_mapa_raw['dist_media'].dropna().empty else 100.0
 
     dist_range = st.sidebar.slider("Rango de Distancia Promedio (Km)", 0.0, max_dist_data, (0.0, max_dist_data))
 
@@ -452,6 +452,7 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
 
 
