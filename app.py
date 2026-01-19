@@ -63,34 +63,31 @@ def formato_miles(valor):
 def cargar_y_procesar_datos():
     # Carga de archivos
 
-    archivos_afi = [
-        'afiliados_parte_1.csv', 
-        'afiliados_parte_2.csv', 
-        'afiliados_parte_3.csv', 
-        'afiliados_parte_4.csv'
-    ]
-    
-    # Leemos cada archivo y los concatenamos en uno solo
+    # 1. Carga de archivos de afiliados
+    archivos_afi = ['afiliados_parte_1.csv', 'afiliados_parte_2.csv', 'afiliados_parte_3.csv', 'afiliados_parte_4.csv']
     lista_df = [pd.read_csv(f, low_memory=False) for f in archivos_afi]
     df_afi_raw = pd.concat(lista_df, ignore_index=True)
-
-    # --- SOLUCIÓN AL ERROR: Convertir columnas a Mayúsculas y limpiar espacios ---
     df_afi_raw.columns = df_afi_raw.columns.str.upper().str.strip()
 
-    # Convertimos Latitud y Longitud: reemplazamos coma por punto y pasamos a número
-    for col in ['LATITUD', 'LONGITUD']:
-        if col in df_afi_raw.columns:
-            # Convertimos a string primero para asegurar que .str funcione, 
-            # reemplazamos la coma y convertimos a float
-            df_afi_raw[col] = pd.to_numeric(
-                df_afi_raw[col].astype(str).str.replace(',', '.'), 
-                errors='coerce'
-            )
     
     df_cons_raw = pd.read_csv('Consultorios GeoLocalizacion (1).csv')
 
     # FILTRO POR PAÍS
     df_cons_raw = df_cons_raw[df_cons_raw['PAIS'] == 'ARGENTINA']
+
+    # --- FUNCIÓN DE LIMPIEZA DEFINITIVA PARA COORDENADAS ---
+    def limpiar_coordenadas(df):
+        for col in ['LATITUD', 'LONGITUD']:
+            if col in df.columns:
+                # Convertimos a string, quitamos espacios/tabs, cambiamos coma por punto
+                df[col] = df[col].astype(str).str.strip().str.replace(',', '.')
+                # Convertimos a número (lo que no se puede, queda como NaN)
+                df[col] = pd.to_numeric(df[col], errors='coerce')
+        return df
+
+    # Limpiamos ambas bases ANTES de cualquier otra operación
+    df_afi_raw = limpiar_coordenadas(df_afi_raw)
+    df_cons_raw = limpiar_coordenadas(df_cons_raw)
 
     
     # A. Deduplicación y limpieza
@@ -452,6 +449,7 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
 
 
