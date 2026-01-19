@@ -18,99 +18,108 @@ import pyodbc
 
 
 # Función con caché para no conectar a la DB en cada click:
+@st.cache_resource
+def conectar_db():
+    return pyodbc.connect('DSN=PostgresUP')
+    
+
+# --- SEGURIDAD ---
+CLAVE_DESARROLLADOR = "admin123" # Cambia esto por tu clave
+
+
+# Configuración de la página
+
+st.set_page_config(page_title="Tablero de Cobertura Geográfica", layout="wide")
+
+
+
+# --- 1. FUNCIONES DE FORMATO ---
+
+def formato_es(valor):
+
+    if pd.isna(valor) or valor == 0: return "0,00"
+
+    return f"{valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+
+
+def formato_porcentaje(parte, total):
+
+    if total == 0: return "0,0 %"
+
+    return f"{(parte / total) * 100:.1f}".replace(".", ",") + " %"
+
+
+
+def formato_miles(valor):
+
+    return f"{int(valor):,}".replace(",", ".")
+
+
+
+# --- 2. PROCESAMIENTO DE DATOS ---
+
 @st.cache_data
 def cargar_y_procesar_datos():
-    # 1. Carga de archivos
-    archivos_afi = ['afiliados_parte_1.csv', 'afiliados_parte_2.csv', 'afiliados_parte_3.csv', 'afiliados_parte_4.csv']
-    lista_df = []
-    for f in archivos_afi:
-        try:
-            df_temp = pd.read_csv(f)
-            df_temp.columns = df_temp.columns.str.upper().str.strip()
-            lista_df.append(df_temp)
-        except:
-            continue
-    
-    df_afi_raw = pd.concat(lista_df, ignore_index=True)
-
-    # --- CORRECCIÓN DE COORDENADAS PARA TU FORMATO ---
-    def corregir_coordenadas(serie):
-        # Convertimos a string y limpiamos
-        s = serie.astype(str).str.replace(r'[^0-9\-]', '', regex=True)
-        # Si el número es muy largo (ej: -34565076049), tomamos los primeros 3 caracteres y el resto decimal
-        def formatear(x):
-            if len(x) > 3:
-                return float(x[:3] + '.' + x[3:])
-            return pd.to_numeric(x, errors='coerce')
-        return s.apply(formatear)
-
-    df_afi_raw['LATITUD'] = corregir_coordenadas(df_afi_raw['LATITUD'])
-    df_afi_raw['LONGITUD'] = corregir_coordenadas(df_afi_raw['LONGITUD'])
-
-    # 2. Base de Consultorios
+    # Carga de archivos
+    df_afi_raw = pd.read_csv('Afiliados interior geolocalizacion.csv')
     df_cons_raw = pd.read_csv('Consultorios GeoLocalizacion (1).csv')
-    df_cons_raw.columns = df_cons_raw.columns.str.upper().str.strip()
-    # Limpieza similar para consultorios si fuera necesario
-    df_cons_raw['LATITUD'] = pd.to_numeric(df_cons_raw['LATITUD'], errors='coerce')
-    df_cons_raw['LONGITUD'] = pd.to_numeric(df_cons_raw['LONGITUD'], errors='coerce')
 
-    # 3. AFILIADOS LIMPIOS (Para estadísticas)
-    # Quitamos duplicados pero mantenemos la base para el conteo total
-    df_afi_clean = df_afi_raw.drop_duplicates(subset=['AFI_ID'])
+    # FILTRO POR PAÍS
+    df_cons_raw = df_cons_raw[df_cons_raw['PAIS'] == 'ARGENTINA']
 
-    # 4. FILTRADO GEOGRÁFICO (Para el Mapa)
+    
+    # A. Deduplicación y limpieza
+    df_afi_clean = df_afi_raw.drop_duplicates(subset=['AFI_ID', 'CALLE', 'NUMERO'])
+    
     LAT_MIN, LAT_MAX = -56.0, -21.0
     LON_MIN, LON_MAX = -74.0, -53.0
-    
-    df_mapa_afi = df_afi_clean[
-        (df_afi_clean['LATITUD'].between(LAT_MIN, LAT_MAX)) & 
-        (df_afi_clean['LONGITUD'].between(LON_MIN, LON_MAX))
-    ].copy()
-    
-    df_mapa_cons = df_cons_raw[
-        (df_cons_raw['PAIS'] == 'ARGENTINA') &
-        (df_cons_raw['LATITUD'].between(LAT_MIN, LAT_MAX)) & 
-        (df_cons_raw['LONGITUD'].between(LON_MIN, LON_MAX))
-    ].copy()
 
-    # 5. CÁLCULO DE DISTANCIAS
-    if not df_mapa_cons.empty and not df_mapa_afi.empty:
-        tree = cKDTree(df_mapa_cons[['LATITUD', 'LONGITUD']].values)
-        dist, _ = tree.query(df_mapa_afi[['LATITUD', 'LONGITUD']].values, k=1)
-        df_mapa_afi['distancia_km'] = dist * 111.13
-    else:
-        df_mapa_afi['distancia_km'] = np.nan
+    def filtrar_geo(df):
+        df['LATITUD'] = pd.to_numeric(df['LATITUD'], errors='coerce')
+        df['LONGITUD'] = pd.to_numeric(df['LONGITUD'], errors='coerce')
+        mask = (df['LATITUD'].between(LAT_MIN, LAT_MAX)) & (df['LONGITUD'].between(LON_MIN, LON_MAX))
+        return df[mask].copy()
 
-    # 6. AGRUPACIÓN (IMPORTANTE: Agrupamos sobre la base LIMPIA, no solo la del mapa)
-    # Así, si no tienen coordenadas, igual aparecen en la tabla con distancia "-"
-    resumen_afi = df_afi_clean.groupby(['LOCALIDAD', 'PROVINCIA']).agg(
-        cant_afiliados=('AFI_ID', 'nunique')
-    ).reset_index()
+    df_mapa_afi = filtrar_geo(df_afi_clean)
+    df_mapa_cons = filtrar_geo(df_cons_raw)
 
-    # Obtenemos las coordenadas y distancias de los que SÍ están en el mapa
-    resumen_geo = df_mapa_afi.groupby(['LOCALIDAD', 'PROVINCIA']).agg(
+    # B. Cálculo de Distancias
+    tree = cKDTree(df_mapa_cons[['LATITUD', 'LONGITUD']].values)
+    dist, _ = tree.query(df_mapa_afi[['LATITUD', 'LONGITUD']].values, k=1)
+    df_mapa_afi['distancia_km'] = dist * 111.13 
+
+    # C. Agrupación
+    resumen_afi = df_mapa_afi.groupby(['LOCALIDAD', 'PROVINCIA']).agg(
+        cant_afiliados=('AFI_ID', 'nunique'),
         dist_media=('distancia_km', 'mean'),
         lat_ref=('LATITUD', 'mean'), 
         lon_ref=('LONGITUD', 'mean')
     ).reset_index()
 
-    resumen_afi = pd.merge(resumen_afi, resumen_geo, on=['LOCALIDAD', 'PROVINCIA'], how='left')
-
+    # Agrupamos consultorios y obtenemos sus coordenadas promedio también
     resumen_cons = df_mapa_cons.groupby(['LOCALIDAD', 'PROVINCIA']).agg(
         cant_consultorios=('LOCALIDAD', 'size'),
         lat_cons=('LATITUD', 'mean'),
         lon_cons=('LONGITUD', 'mean')
     ).reset_index()
 
-    # Merge final
+    # D. USAMOS MERGE OUTER PARA MOSTRAR TAMBIÉN LOCALIDADES CON CONSULTORIOS SIN AFILIADOS.
+    # Esto asegura que si hay consultorios en una ciudad sin afiliados, la ciudad NO desaparezca.
     data_final = pd.merge(resumen_afi, resumen_cons, on=['LOCALIDAD', 'PROVINCIA'], how='outer').fillna(0)
     
-    # Consolidar coordenadas para el mapa
+    # Consolidamos coordenadas: Si no hay lat_ref (porque no hay afiliados), usamos lat_cons
     data_final['lat_ref'] = np.where(data_final['lat_ref'] == 0, data_final['lat_cons'], data_final['lat_ref'])
     data_final['lon_ref'] = np.where(data_final['lon_ref'] == 0, data_final['lon_cons'], data_final['lon_ref'])
-    
+
+    # Si no hay afiliados, la distancia media no existe (NaN) para que luego se vea como "-"
     data_final.loc[data_final['cant_afiliados'] == 0, 'dist_media'] = np.nan
+    
+    # Cálculo del ratio
     data_final['cons_por_afi'] = data_final['cant_consultorios'] / data_final['cant_afiliados'].replace(0, np.nan)
+    
+    # Limpiamos columnas auxiliares
+    data_final = data_final.drop(columns=['lat_cons', 'lon_cons'])
     
     return data_final, df_afi_clean, df_cons_raw, df_mapa_afi, df_mapa_cons
 
@@ -193,25 +202,9 @@ try:
 
 
 
-    # 1. Filtramos valores válidos para calcular el máximo de forma segura
-    distancias_validas = data_mapa_raw['dist_media'].dropna()
+    max_dist_data = float(data_mapa_raw['dist_media'].dropna().max())
 
-    if not distancias_validas.empty:
-        max_dist_data = float(distancias_validas.max())
-    else:
-        max_dist_data = 100.0  # Valor de respaldo si no hay datos
-
-    # 2. Verificamos que no sea NaN o 0 (Streamlit requiere max > min)
-    if pd.isna(max_dist_data) or max_dist_data <= 0:
-        max_dist_data = 1.0
-
-    # 3. Slider seguro
-    dist_range = st.sidebar.slider(
-        "Rango de Distancia Promedio (Km)", 
-        0.0, 
-        max_dist_data, 
-        (0.0, max_dist_data)
-    )
+    dist_range = st.sidebar.slider("Rango de Distancia Promedio (Km)", 0.0, max_dist_data, (0.0, max_dist_data))
 
     
     # --- APLICAR FILTROS EN CADENA ---
@@ -435,11 +428,3 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
-
-
-
-
-
-
-
-
