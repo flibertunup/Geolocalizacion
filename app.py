@@ -71,7 +71,7 @@ def cargar_y_procesar_datos():
     ]
     
     # Leemos cada archivo y los concatenamos en uno solo
-    lista_df = [pd.read_csv(f) for f in archivos_afi]
+    lista_df = [pd.read_csv(f, low_memory=False) for f in archivos_afi]
     df_afi_raw = pd.concat(lista_df, ignore_index=True)
 
     # --- SOLUCIÓN AL ERROR: Convertir columnas a Mayúsculas y limpiar espacios ---
@@ -452,6 +452,7 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
 
 
