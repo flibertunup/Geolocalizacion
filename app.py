@@ -76,6 +76,16 @@ def cargar_y_procesar_datos():
 
     # --- SOLUCIÓN AL ERROR: Convertir columnas a Mayúsculas y limpiar espacios ---
     df_afi_raw.columns = df_afi_raw.columns.str.upper().str.strip()
+
+    # Convertimos Latitud y Longitud: reemplazamos coma por punto y pasamos a número
+    for col in ['LATITUD', 'LONGITUD']:
+        if col in df_afi_raw.columns:
+            # Convertimos a string primero para asegurar que .str funcione, 
+            # reemplazamos la coma y convertimos a float
+            df_afi_raw[col] = pd.to_numeric(
+                df_afi_raw[col].astype(str).str.replace(',', '.'), 
+                errors='coerce'
+            )
     
     df_cons_raw = pd.read_csv('Consultorios GeoLocalizacion (1).csv')
 
@@ -442,5 +452,6 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
 
