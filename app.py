@@ -61,8 +61,7 @@ def formato_miles(valor):
 
 @st.cache_data
 def cargar_y_procesar_datos():
-    # Carga de archivos
-
+    # 1. Carga de archivos unificados
     archivos_afi = [
         'afiliados_parte_1.csv', 
         'afiliados_parte_2.csv', 
@@ -70,46 +69,51 @@ def cargar_y_procesar_datos():
         'afiliados_parte_4.csv'
     ]
 
-    # Leemos cada archivo y los concatenamos en uno solo
-    lista_df = [pd.read_csv(f) for f in archivos_afi]
+    lista_df = []
+    for f in archivos_afi:
+        df_temp = pd.read_csv(f)
+        # Normalizar columnas de cada parte inmediatamente
+        df_temp.columns = df_temp.columns.str.upper().str.strip()
+        lista_df.append(df_temp)
+    
     df_afi_raw = pd.concat(lista_df, ignore_index=True)
 
-    df_afi_raw.columns = df_afi_raw.columns.str.upper().str.strip()
+    # 2. PROCESAMIENTO SEGURO DE COORDENADAS
+    # Convertimos a número. Si hay puntos extra o texto, 'coerce' los hará NaN
+    # pero no romperá el programa.
+    df_afi_raw['LATITUD'] = pd.to_numeric(df_afi_raw['LATITUD'], errors='coerce')
+    df_afi_raw['LONGITUD'] = pd.to_numeric(df_afi_raw['LONGITUD'], errors='coerce')
 
-    # Convertir a string, quitar puntos extra (excepto el primero) y pasar a numérico
-    df_afi_raw['LATITUD'] = pd.to_numeric(df_afi_raw['LATITUD'].astype(str).str.replace('.', '', regex=False).str.replace(r'^(\-\d{2})', r'\1.', regex=True), errors='coerce')
-    df_afi_raw['LONGITUD'] = pd.to_numeric(df_afi_raw['LONGITUD'].astype(str).str.replace('.', '', regex=False).str.replace(r'^(\-\d{2})', r'\1.', regex=True), errors='coerce')
-
-    # Eliminar filas que se quedaron sin coordenadas válidas
-    df_afi_raw = df_afi_raw.dropna(subset=['LATITUD', 'LONGITUD'])
-    
-    df_cons_raw = pd.read_csv('Consultorios GeoLocalizacion (1).csv')
-
-    # FILTRO POR PAÍS
-    df_cons_raw = df_cons_raw[df_cons_raw['PAIS'] == 'ARGENTINA']
-
-    
-    # A. Deduplicación y limpieza
+    # IMPORTANTE: No borramos los NaN todavía para que el conteo de afiliados totales sea real
     df_afi_clean = df_afi_raw.drop_duplicates(subset=['AFI_ID', 'CALLE', 'NUMERO'])
     
+    # 3. Datos de Consultorios
+    df_cons_raw = pd.read_csv('Consultorios GeoLocalizacion (1).csv')
+    df_cons_raw.columns = df_cons_raw.columns.str.upper().str.strip()
+    df_cons_raw = df_cons_raw[df_cons_raw['PAIS'] == 'ARGENTINA']
+
+    # 4. Límites geográficos
     LAT_MIN, LAT_MAX = -56.0, -21.0
     LON_MIN, LON_MAX = -74.0, -53.0
 
     def filtrar_geo(df):
-        df['LATITUD'] = pd.to_numeric(df['LATITUD'], errors='coerce')
-        df['LONGITUD'] = pd.to_numeric(df['LONGITUD'], errors='coerce')
+        # Solo para el mapa filtramos los que tienen coordenadas válidas
         mask = (df['LATITUD'].between(LAT_MIN, LAT_MAX)) & (df['LONGITUD'].between(LON_MIN, LON_MAX))
         return df[mask].copy()
 
+    # Aquí se separan los que van al mapa de los que son base estadística
     df_mapa_afi = filtrar_geo(df_afi_clean)
     df_mapa_cons = filtrar_geo(df_cons_raw)
 
-    # B. Cálculo de Distancias
-    tree = cKDTree(df_mapa_cons[['LATITUD', 'LONGITUD']].values)
-    dist, _ = tree.query(df_mapa_afi[['LATITUD', 'LONGITUD']].values, k=1)
-    df_mapa_afi['distancia_km'] = dist * 111.13 
+    # 5. Cálculo de Distancias (solo para los que tienen geo)
+    if not df_mapa_cons.empty and not df_mapa_afi.empty:
+        tree = cKDTree(df_mapa_cons[['LATITUD', 'LONGITUD']].values)
+        dist, _ = tree.query(df_mapa_afi[['LATITUD', 'LONGITUD']].values, k=1)
+        df_mapa_afi['distancia_km'] = dist * 111.13
+    else:
+        df_mapa_afi['distancia_km'] = np.nan
 
-    # C. Agrupación
+    # 6. Agrupación (USAMOS df_mapa_afi para que el resumen tenga coordenadas)
     resumen_afi = df_mapa_afi.groupby(['LOCALIDAD', 'PROVINCIA']).agg(
         cant_afiliados=('AFI_ID', 'nunique'),
         dist_media=('distancia_km', 'mean'),
@@ -117,28 +121,18 @@ def cargar_y_procesar_datos():
         lon_ref=('LONGITUD', 'mean')
     ).reset_index()
 
-    # Agrupamos consultorios y obtenemos sus coordenadas promedio también
     resumen_cons = df_mapa_cons.groupby(['LOCALIDAD', 'PROVINCIA']).agg(
         cant_consultorios=('LOCALIDAD', 'size'),
         lat_cons=('LATITUD', 'mean'),
         lon_cons=('LONGITUD', 'mean')
     ).reset_index()
 
-    # D. USAMOS MERGE OUTER PARA MOSTRAR TAMBIÉN LOCALIDADES CON CONSULTORIOS SIN AFILIADOS.
-    # Esto asegura que si hay consultorios en una ciudad sin afiliados, la ciudad NO desaparezca.
+    # Merge y cálculos finales (igual que antes)
     data_final = pd.merge(resumen_afi, resumen_cons, on=['LOCALIDAD', 'PROVINCIA'], how='outer').fillna(0)
-    
-    # Consolidamos coordenadas: Si no hay lat_ref (porque no hay afiliados), usamos lat_cons
     data_final['lat_ref'] = np.where(data_final['lat_ref'] == 0, data_final['lat_cons'], data_final['lat_ref'])
     data_final['lon_ref'] = np.where(data_final['lon_ref'] == 0, data_final['lon_cons'], data_final['lon_ref'])
-
-    # Si no hay afiliados, la distancia media no existe (NaN) para que luego se vea como "-"
     data_final.loc[data_final['cant_afiliados'] == 0, 'dist_media'] = np.nan
-    
-    # Cálculo del ratio
     data_final['cons_por_afi'] = data_final['cant_consultorios'] / data_final['cant_afiliados'].replace(0, np.nan)
-    
-    # Limpiamos columnas auxiliares
     data_final = data_final.drop(columns=['lat_cons', 'lon_cons'])
     
     return data_final, df_afi_clean, df_cons_raw, df_mapa_afi, df_mapa_cons
@@ -464,6 +458,7 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
 
 
