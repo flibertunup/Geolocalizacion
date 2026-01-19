@@ -216,24 +216,24 @@ try:
 
 
     # 1. Filtramos valores válidos para calcular el máximo de forma segura
-distancias_validas = data_mapa_raw['dist_media'].dropna()
+    distancias_validas = data_mapa_raw['dist_media'].dropna()
 
-if not distancias_validas.empty:
-    max_dist_data = float(distancias_validas.max())
-else:
-    max_dist_data = 100.0  # Valor de respaldo si no hay datos
+    if not distancias_validas.empty:
+        max_dist_data = float(distancias_validas.max())
+    else:
+        max_dist_data = 100.0  # Valor de respaldo si no hay datos
 
-# 2. Verificamos que no sea NaN o 0 (Streamlit requiere max > min)
-if pd.isna(max_dist_data) or max_dist_data <= 0:
-    max_dist_data = 1.0
+    # 2. Verificamos que no sea NaN o 0 (Streamlit requiere max > min)
+    if pd.isna(max_dist_data) or max_dist_data <= 0:
+        max_dist_data = 1.0
 
-# 3. Slider seguro
-dist_range = st.sidebar.slider(
-    "Rango de Distancia Promedio (Km)", 
-    0.0, 
-    max_dist_data, 
-    (0.0, max_dist_data)
-)
+    # 3. Slider seguro
+    dist_range = st.sidebar.slider(
+        "Rango de Distancia Promedio (Km)", 
+        0.0, 
+        max_dist_data, 
+        (0.0, max_dist_data)
+    )
 
     
     # --- APLICAR FILTROS EN CADENA ---
@@ -457,6 +457,7 @@ dist_range = st.sidebar.slider(
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
 
 
