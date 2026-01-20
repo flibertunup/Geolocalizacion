@@ -18,51 +18,9 @@ import pyodbc
 
 
 # Función con caché para no conectar a la DB en cada click:
-@st.cache_resource
-def conectar_db():
-    return pyodbc.connect('DSN=PostgresUP')
-    
-
-# --- SEGURIDAD ---
-CLAVE_DESARROLLADOR = "admin123" # Cambia esto por tu clave
-
-
-# Configuración de la página
-
-st.set_page_config(page_title="Tablero de Cobertura Geográfica", layout="wide")
-
-
-
-# --- 1. FUNCIONES DE FORMATO ---
-
-def formato_es(valor):
-
-    if pd.isna(valor) or valor == 0: return "0,00"
-
-    return f"{valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-
-
-
-def formato_porcentaje(parte, total):
-
-    if total == 0: return "0,0 %"
-
-    return f"{(parte / total) * 100:.1f}".replace(".", ",") + " %"
-
-
-
-def formato_miles(valor):
-
-    return f"{int(valor):,}".replace(",", ".")
-
-
-
-# --- 2. PROCESAMIENTO DE DATOS ---
-
-# --- 2. PROCESAMIENTO DE DATOS ---
-
 @st.cache_data
 def cargar_y_procesar_datos():
+    # 1. Carga de archivos
     archivos_excel = [
         'afiliados interior geolocalizacion parte 1.xlsx',
         'afiliados interior geolocalizacion parte 2.xlsx',
@@ -72,59 +30,60 @@ def cargar_y_procesar_datos():
     lista_df = []
     for f in archivos_excel:
         try:
-            # Intentamos leer el Excel. Si falla, es posible que debas instalar 'openpyxl'
             df_temp = pd.read_excel(f)
             if 'Fila' in df_temp.columns:
                 df_temp = df_temp.drop(columns=['Fila'])
             lista_df.append(df_temp)
-        except:
-            continue
+        except Exception as e:
+            st.warning(f"No se pudo cargar {f}: {e}")
     
     df_afi_raw = pd.concat(lista_df, ignore_index=True)
     df_afi_raw.columns = df_afi_raw.columns.str.upper().str.strip()
-    
+
     df_cons_raw = pd.read_csv('Consultorios GeoLocalizacion (1).csv')
     df_cons_raw.columns = df_cons_raw.columns.str.upper().str.strip()
 
     # --- FUNCIÓN DE LIMPIEZA DEFINITIVA ---
-    def limpiar_num_pro(serie):
-        # 1. Convertimos a string y quitamos espacios
-        # 2. Reemplazamos coma por punto (Crucial para tus archivos)
-        # 3. Forzamos a numérico, lo que no sea número será NaN
+    # Esta función quita espacios, cambia comas por puntos y convierte a número
+    def limpiar_coordenadas(serie):
         return pd.to_numeric(serie.astype(str).str.strip().str.replace(',', '.'), errors='coerce')
 
-    # Aplicamos la limpieza antes de cualquier filtro
-    df_afi_raw['LATITUD'] = limpiar_num_pro(df_afi_raw['LATITUD'])
-    df_afi_raw['LONGITUD'] = limpiar_num_pro(df_afi_raw['LONGITUD'])
-    df_cons_raw['LATITUD'] = limpiar_num_pro(df_cons_raw['LATITUD'])
-    df_cons_raw['LONGITUD'] = limpiar_num_pro(df_cons_raw['LONGITUD'])
+    # Aplicamos la limpieza a todas las columnas de coordenadas
+    df_afi_raw['LATITUD'] = limpiar_coordenadas(df_afi_raw['LATITUD'])
+    df_afi_raw['LONGITUD'] = limpiar_coordenadas(df_afi_raw['LONGITUD'])
+    df_cons_raw['LATITUD'] = limpiar_coordenadas(df_cons_raw['LATITUD'])
+    df_cons_raw['LONGITUD'] = limpiar_coordenadas(df_cons_raw['LONGITUD'])
 
     # Filtro por país
     df_cons_raw = df_cons_raw[df_cons_raw['PAIS'] == 'ARGENTINA']
-    
+     
     # A. Deduplicación
     df_afi_clean = df_afi_raw.drop_duplicates(subset=['AFI_ID', 'CALLE', 'NUMERO'])
     
     LAT_MIN, LAT_MAX = -56.0, -21.0
     LON_MIN, LON_MAX = -74.0, -53.0
 
+    # B. Función de filtrado corregida (ya no necesita pd.to_numeric adentro)
     def filtrar_geo(df):
-        # Eliminamos filas donde la latitud o longitud sea NaN (evita el error de comparación)
-        df_limpio = df.dropna(subset=['LATITUD', 'LONGITUD']).copy()
-        # Ahora la comparación es segura entre Floats
-        mask = (df_limpio['LATITUD'].between(LAT_MIN, LAT_MAX)) & (df_limpio['LONGITUD'].between(LON_MIN, LON_MAX))
-        return df_limpio[mask].copy()
+        # Eliminamos filas que quedaron como NaN tras la limpieza
+        df_solo_num = df.dropna(subset=['LATITUD', 'LONGITUD']).copy()
+        # Ahora la comparación es 100% segura entre números (floats)
+        mask = (df_solo_num['LATITUD'].between(LAT_MIN, LAT_MAX)) & \
+               (df_solo_num['LONGITUD'].between(LON_MIN, LON_MAX))
+        return df_solo_num[mask].copy()
 
     df_mapa_afi = filtrar_geo(df_afi_clean)
     df_mapa_cons = filtrar_geo(df_cons_raw)
 
-    # B. Cálculo de Distancias
-    # Aseguramos que no haya nulos antes de entrar al árbol de búsqueda
-    tree = cKDTree(df_mapa_cons[['LATITUD', 'LONGITUD']].values)
-    dist, _ = tree.query(df_mapa_afi[['LATITUD', 'LONGITUD']].values, k=1)
-    df_mapa_afi['distancia_km'] = dist * 111.13 
+    # C. Cálculo de Distancias
+    if not df_mapa_cons.empty and not df_mapa_afi.empty:
+        tree = cKDTree(df_mapa_cons[['LATITUD', 'LONGITUD']].values)
+        dist, _ = tree.query(df_mapa_afi[['LATITUD', 'LONGITUD']].values, k=1)
+        df_mapa_afi['distancia_km'] = dist * 111.13
+    else:
+        df_mapa_afi['distancia_km'] = np.nan
 
-    # --- El resto de la función (Agrupación C y D) se mantiene igual ---
+    # D. Agrupación
     resumen_afi = df_mapa_afi.groupby(['LOCALIDAD', 'PROVINCIA']).agg(
         cant_afiliados=('AFI_ID', 'nunique'),
         dist_media=('distancia_km', 'mean'),
@@ -139,14 +98,16 @@ def cargar_y_procesar_datos():
     ).reset_index()
 
     data_final = pd.merge(resumen_afi, resumen_cons, on=['LOCALIDAD', 'PROVINCIA'], how='outer').fillna(0)
+    
     data_final['lat_ref'] = np.where(data_final['lat_ref'] == 0, data_final['lat_cons'], data_final['lat_ref'])
     data_final['lon_ref'] = np.where(data_final['lon_ref'] == 0, data_final['lon_cons'], data_final['lon_ref'])
+
     data_final.loc[data_final['cant_afiliados'] == 0, 'dist_media'] = np.nan
     data_final['cons_por_afi'] = data_final['cant_consultorios'] / data_final['cant_afiliados'].replace(0, np.nan)
+    
     data_final = data_final.drop(columns=['lat_cons', 'lon_cons'])
     
     return data_final, df_afi_clean, df_cons_raw, df_mapa_afi, df_mapa_cons
-
 
 # --- 3. INTERFAZ Y FILTROS ---
 
@@ -453,5 +414,6 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
 
