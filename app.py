@@ -69,79 +69,57 @@ def cargar_y_procesar_datos():
         af."afi_id"        AS "AFI_ID",
         COALESCE(
              (SELECT dafi."domiafi_id" FROM "v_sa_domicilios_afiliado" dafi, "sa_domiafi_td" datd
-              WHERE dafi."afi_afi_id" = af."afi_id" AND dafi."domiafi_id" = datd."domiafi_domiafi_id" AND datd."td_codigo" = 'POST' LIMIT 1),
-             (SELECT dafi."domiafi_id" FROM "v_sa_domicilios_afiliado" dafi, "sa_domiafi_td" datd
-              WHERE dafi."afi_afi_id" = af."afi_id" AND dafi."domiafi_id" = datd."domiafi_domiafi_id" AND datd."td_codigo" = 'POST' LIMIT 1)
+              WHERE dafi."afi_afi_id"::text = af."afi_id"::text 
+              AND dafi."domiafi_id"::text = datd."domiafi_domiafi_id"::text 
+              AND datd."td_codigo" = 'POST' LIMIT 1)
         ) AS "DOMIAFI_ID",
         COALESCE(
              (SELECT dafi."calle" FROM "v_sa_domicilios_afiliado" dafi, "sa_domiafi_td" datd
-              WHERE dafi."afi_afi_id" = af."afi_id" AND dafi."domiafi_id" = datd."domiafi_domiafi_id" AND datd."td_codigo" = 'POST' LIMIT 1),
-             (SELECT dafi."calle" FROM "v_sa_domicilios_afiliado" dafi, "sa_domiafi_td" datd
-              WHERE dafi."afi_afi_id" = af."afi_id" AND dafi."domiafi_id" = datd."domiafi_domiafi_id" AND datd."td_codigo" = 'POST' LIMIT 1)
+              WHERE dafi."afi_afi_id"::text = af."afi_id"::text 
+              AND dafi."domiafi_id"::text = datd."domiafi_domiafi_id"::text 
+              AND datd."td_codigo" = 'POST' LIMIT 1)
         ) AS "CALLE",
         COALESCE(
              (SELECT dafi."numero" FROM "v_sa_domicilios_afiliado" dafi, "sa_domiafi_td" datd
-              WHERE dafi."afi_afi_id" = af."afi_id" AND dafi."domiafi_id" = datd."domiafi_domiafi_id" AND datd."td_codigo" = 'POST' LIMIT 1),
-             (SELECT dafi."numero" FROM "v_sa_domicilios_afiliado" dafi, "sa_domiafi_td" datd
-              WHERE dafi."afi_afi_id" = af."afi_id" AND dafi."domiafi_id" = datd."domiafi_domiafi_id" AND datd."td_codigo" = 'POST' LIMIT 1)
+              WHERE dafi."afi_afi_id"::text = af."afi_id"::text 
+              AND dafi."domiafi_id"::text = datd."domiafi_domiafi_id"::text 
+              AND datd."td_codigo" = 'POST' LIMIT 1)
         ) AS "NUMERO",
-        COALESCE(
-             (SELECT dafi."piso" FROM "v_sa_domicilios_afiliado" dafi, "sa_domiafi_td" datd
-              WHERE dafi."afi_afi_id" = af."afi_id" AND dafi."domiafi_id" = datd."domiafi_domiafi_id" AND datd."td_codigo" = 'POST' LIMIT 1),
-             (SELECT dafi."piso" FROM "v_sa_domicilios_afiliado" dafi, "sa_domiafi_td" datd
-              WHERE dafi."afi_afi_id" = af."afi_id" AND dafi."domiafi_id" = datd."domiafi_domiafi_id" AND datd."td_codigo" = 'POST' LIMIT 1)
-        ) AS "PISO",
-        COALESCE(
-             (SELECT dafi."dpto" FROM "v_sa_domicilios_afiliado" dafi, "sa_domiafi_td" datd
-              WHERE dafi."afi_afi_id" = af."afi_id" AND dafi."domiafi_id" = datd."domiafi_domiafi_id" AND datd."td_codigo" = 'POST' LIMIT 1),
-             (SELECT dafi."dpto" FROM "v_sa_domicilios_afiliado" dafi, "sa_domiafi_td" datd
-              WHERE dafi."afi_afi_id" = af."afi_id" AND dafi."domiafi_id" = datd."domiafi_domiafi_id" AND datd."td_codigo" = 'POST' LIMIT 1)
-        ) AS "DEPARTAMENTO",
-        COALESCE (
-             (SELECT loc."codigo_postal" FROM "v_sa_domicilios_afiliado" dafi, "sa_domiafi_td" datd, "sa_localidades" loc
-              WHERE dafi."afi_afi_id" = af."afi_id" AND dafi."domiafi_id" = datd."domiafi_domiafi_id" AND loc."loc_id" = dafi."loc_loc_id" AND datd."td_codigo" = 'POST' LIMIT 1),
-             (SELECT loc."codigo_postal" FROM "v_sa_domicilios_afiliado" dafi, "sa_domiafi_td" datd, "sa_localidades" loc
-              WHERE dafi."afi_afi_id" = af."afi_id" AND dafi."domiafi_id" = datd."domiafi_domiafi_id" AND loc."loc_id" = dafi."loc_loc_id" AND datd."td_codigo" = 'POST' LIMIT 1)
-        ) AS "CODIGOPOST",
         COALESCE (
              (SELECT loc."localidad" FROM "v_sa_domicilios_afiliado" dafi, "sa_domiafi_td" datd, "sa_localidades" loc
-              WHERE dafi."afi_afi_id" = af."afi_id" AND dafi."domiafi_id" = datd."domiafi_domiafi_id" AND loc."loc_id" = dafi."loc_loc_id" AND datd."td_codigo" = 'POST' LIMIT 1),
-             (SELECT loc."localidad" FROM "v_sa_domicilios_afiliado" dafi, "sa_domiafi_td" datd, "sa_localidades" loc
-              WHERE dafi."afi_afi_id" = af."afi_id" AND dafi."domiafi_id" = datd."domiafi_domiafi_id" AND loc."loc_id" = dafi."loc_loc_id" AND datd."td_codigo" = 'POST' LIMIT 1)
+              WHERE dafi."afi_afi_id"::text = af."afi_id"::text 
+              AND dafi."domiafi_id"::text = datd."domiafi_domiafi_id"::text 
+              AND loc."loc_id"::text = dafi."loc_loc_id"::text 
+              AND datd."td_codigo" = 'POST' LIMIT 1)
         ) AS "LOCALIDAD",
         COALESCE (
-             (SELECT loc."pcia_codigo" FROM "v_sa_domicilios_afiliado" dafi, "sa_domiafi_td" datd, "sa_localidades" loc
-              WHERE dafi."afi_afi_id" = af."afi_id" AND dafi."domiafi_id" = datd."domiafi_domiafi_id" AND loc."loc_id" = dafi."loc_loc_id" AND datd."td_codigo" = 'POST' LIMIT 1),
-             (SELECT loc."pcia_codigo" FROM "v_sa_domicilios_afiliado" dafi, "sa_domiafi_td" datd, "sa_localidades" loc
-              WHERE dafi."afi_afi_id" = af."afi_id" AND dafi."domiafi_id" = datd."domiafi_domiafi_id" AND loc."loc_id" = dafi."loc_loc_id" AND datd."td_codigo" = 'POST' LIMIT 1)
-        ) AS "CODIGO_PROVINCIA",
-        COALESCE (
              (SELECT p."nombre" FROM "v_sa_domicilios_afiliado" dafi, "sa_domiafi_td" datd, "sa_localidades" loc, "sa_provincias" p
-              WHERE dafi."afi_afi_id" = af."afi_id" AND dafi."domiafi_id" = datd."domiafi_domiafi_id" AND loc."loc_id" = dafi."loc_loc_id" AND datd."td_codigo" = 'POST' 
-              AND p."codigo"::text = loc."pcia_codigo"::text LIMIT 1), -- CAST AQUÍ
-             (SELECT p."nombre" FROM "v_sa_domicilios_afiliado" dafi, "sa_domiafi_td" datd, "sa_localidades" loc, "sa_provincias" p
-              WHERE dafi."afi_afi_id" = af."afi_id" AND dafi."domiafi_id" = datd."domiafi_domiafi_id" AND loc."loc_id" = dafi."loc_loc_id" AND datd."td_codigo" = 'POST' 
-              AND p."codigo"::text = loc."pcia_codigo"::text LIMIT 1) -- CAST AQUÍ
+              WHERE dafi."afi_afi_id"::text = af."afi_id"::text 
+              AND dafi."domiafi_id"::text = datd."domiafi_domiafi_id"::text 
+              AND loc."loc_id"::text = dafi."loc_loc_id"::text 
+              AND p."codigo"::text = loc."pcia_codigo"::text 
+              AND datd."td_codigo" = 'POST' LIMIT 1)
         ) AS "PROVINCIA",   
         COALESCE (
              (SELECT pa."nombre" FROM "v_sa_domicilios_afiliado" dafi, "sa_domiafi_td" datd, "sa_localidades" loc, "sa_provincias" pr, "sa_paises" pa
-              WHERE dafi."afi_afi_id" = af."afi_id" AND dafi."domiafi_id" = datd."domiafi_domiafi_id" AND loc."loc_id" = dafi."loc_loc_id" AND datd."td_codigo" = 'POST'
-              AND pr."codigo"::text = loc."pcia_codigo"::text AND pr."pais_codigo"::text = pa."codigo"::text LIMIT 1), -- CAST AQUÍ
-             (SELECT pa."nombre" FROM "v_sa_domicilios_afiliado" dafi, "sa_domiafi_td" datd, "sa_localidades" loc, "sa_provincias" pr, "sa_paises" pa
-              WHERE dafi."afi_afi_id" = af."afi_id" AND dafi."domiafi_id" = datd."domiafi_domiafi_id" AND loc."loc_id" = dafi."loc_loc_id" AND datd."td_codigo" = 'POST' 
-              AND pr."codigo"::text = loc."pcia_codigo"::text AND pr."pais_codigo"::text = pa."codigo"::text LIMIT 1) -- CAST AQUÍ
+              WHERE dafi."afi_afi_id"::text = af."afi_id"::text 
+              AND dafi."domiafi_id"::text = datd."domiafi_domiafi_id"::text 
+              AND loc."loc_id"::text = dafi."loc_loc_id"::text 
+              AND pr."codigo"::text = loc."pcia_codigo"::text 
+              AND pr."pais_codigo"::text = pa."codigo"::text 
+              AND datd."td_codigo" = 'POST' LIMIT 1)
         ) AS "PAIS",                       
         COALESCE(
              (SELECT dafi."latitud" FROM "v_sa_domicilios_afiliado" dafi, "sa_domiafi_td" datd
-              WHERE dafi."afi_afi_id" = af."afi_id" AND dafi."domiafi_id" = datd."domiafi_domiafi_id" AND datd."td_codigo" = 'POST' LIMIT 1),
-             (SELECT dafi."latitud" FROM "v_sa_domicilios_afiliado" dafi, "sa_domiafi_td" datd
-              WHERE dafi."afi_afi_id" = af."afi_id" AND dafi."domiafi_id" = datd."domiafi_domiafi_id" AND datd."td_codigo" = 'POST' LIMIT 1)
+              WHERE dafi."afi_afi_id"::text = af."afi_id"::text 
+              AND dafi."domiafi_id"::text = datd."domiafi_domiafi_id"::text 
+              AND datd."td_codigo" = 'POST' LIMIT 1)
         ) AS "LATITUD",
         COALESCE(
              (SELECT dafi."longitud" FROM "v_sa_domicilios_afiliado" dafi, "sa_domiafi_td" datd
-              WHERE dafi."afi_afi_id" = af."afi_id" AND dafi."domiafi_id" = datd."domiafi_domiafi_id" AND datd."td_codigo" = 'POST' LIMIT 1),
-             (SELECT dafi."longitud" FROM "v_sa_domicilios_afiliado" dafi, "sa_domiafi_td" datd
-              WHERE dafi."afi_afi_id" = af."afi_id" AND dafi."domiafi_id" = datd."domiafi_domiafi_id" AND datd."td_codigo" = 'POST' LIMIT 1)
+              WHERE dafi."afi_afi_id"::text = af."afi_id"::text 
+              AND dafi."domiafi_id"::text = datd."domiafi_domiafi_id"::text 
+              AND datd."td_codigo" = 'POST' LIMIT 1)
         ) AS "LONGITUD"     
     FROM "sa_afiliados" af
     WHERE af."estado" = 'A'
@@ -566,5 +544,6 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
 
