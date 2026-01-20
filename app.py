@@ -88,7 +88,7 @@ def cargar_y_procesar_datos():
         st.error("No se pudieron cargar los archivos de afiliados.")
         return None
         
-    df_cons_raw = pd.read_csv('Consultorios GeoLocalizacion (1).csv')
+    df_cons_raw = pd.read_excel('consultorios geolocalizacion 1.xlsx')
     df_cons_raw.columns = df_cons_raw.columns.str.upper()
     
     # FILTRO POR PAÍS
@@ -454,5 +454,6 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
 
