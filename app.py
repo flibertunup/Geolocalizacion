@@ -65,7 +65,7 @@ def cargar_y_procesar_datos():
     SELECT  
         af."codigo"        AS "Codigo",
         af."apellidos"     AS "Apellidos",
-        af."nombres"       AS "Nombres",
+        af."nombres"        AS "Nombres",
         af."afi_id"        AS "AFI_ID",
         COALESCE(
              (SELECT dafi."domiafi_id" FROM "v_sa_domicilios_afiliado" dafi, "sa_domiafi_td" datd
@@ -118,18 +118,18 @@ def cargar_y_procesar_datos():
         COALESCE (
              (SELECT p."nombre" FROM "v_sa_domicilios_afiliado" dafi, "sa_domiafi_td" datd, "sa_localidades" loc, "sa_provincias" p
               WHERE dafi."afi_afi_id" = af."afi_id" AND dafi."domiafi_id" = datd."domiafi_domiafi_id" AND loc."loc_id" = dafi."loc_loc_id" AND datd."td_codigo" = 'POST' 
-              AND p."codigo" = loc."pcia_codigo" LIMIT 1),
+              AND p."codigo"::text = loc."pcia_codigo"::text LIMIT 1), -- CAST AQUÍ
              (SELECT p."nombre" FROM "v_sa_domicilios_afiliado" dafi, "sa_domiafi_td" datd, "sa_localidades" loc, "sa_provincias" p
               WHERE dafi."afi_afi_id" = af."afi_id" AND dafi."domiafi_id" = datd."domiafi_domiafi_id" AND loc."loc_id" = dafi."loc_loc_id" AND datd."td_codigo" = 'POST' 
-              AND p."codigo" = loc."pcia_codigo" LIMIT 1)
+              AND p."codigo"::text = loc."pcia_codigo"::text LIMIT 1) -- CAST AQUÍ
         ) AS "PROVINCIA",   
         COALESCE (
              (SELECT pa."nombre" FROM "v_sa_domicilios_afiliado" dafi, "sa_domiafi_td" datd, "sa_localidades" loc, "sa_provincias" pr, "sa_paises" pa
               WHERE dafi."afi_afi_id" = af."afi_id" AND dafi."domiafi_id" = datd."domiafi_domiafi_id" AND loc."loc_id" = dafi."loc_loc_id" AND datd."td_codigo" = 'POST'
-              AND pr."codigo" = loc."pcia_codigo" AND pr."pais_codigo" = pa."codigo" LIMIT 1),
+              AND pr."codigo"::text = loc."pcia_codigo"::text AND pr."pais_codigo"::text = pa."codigo"::text LIMIT 1), -- CAST AQUÍ
              (SELECT pa."nombre" FROM "v_sa_domicilios_afiliado" dafi, "sa_domiafi_td" datd, "sa_localidades" loc, "sa_provincias" pr, "sa_paises" pa
               WHERE dafi."afi_afi_id" = af."afi_id" AND dafi."domiafi_id" = datd."domiafi_domiafi_id" AND loc."loc_id" = dafi."loc_loc_id" AND datd."td_codigo" = 'POST' 
-              AND pr."codigo" = loc."pcia_codigo" AND pr."pais_codigo" = pa."codigo" LIMIT 1)
+              AND pr."codigo"::text = loc."pcia_codigo"::text AND pr."pais_codigo"::text = pa."codigo"::text LIMIT 1) -- CAST AQUÍ
         ) AS "PAIS",                       
         COALESCE(
              (SELECT dafi."latitud" FROM "v_sa_domicilios_afiliado" dafi, "sa_domiafi_td" datd
@@ -145,7 +145,7 @@ def cargar_y_procesar_datos():
         ) AS "LONGITUD"     
     FROM "sa_afiliados" af
     WHERE af."estado" = 'A'
-    ORDER BY af."apellidos", af."nombres";  
+    ORDER BY af."apellidos", af."nombres";
     """
     # Query de Consultorios (Convertida de Oracle a Postgres)
     query_consultorios = """
@@ -566,4 +566,5 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
