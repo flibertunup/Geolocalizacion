@@ -63,10 +63,25 @@ def formato_miles(valor):
 def cargar_y_procesar_datos():
     # Carga de archivos
 
-    # 1. Carga de archivos de afiliados
-    archivos_afi = ['afiliados_parte_1.csv', 'afiliados_parte_2.csv', 'afiliados_parte_3.csv', 'afiliados_parte_4.csv']
-    lista_df = [pd.read_csv(f, low_memory=False) for f in archivos_afi]
+    # 1. Carga de los 3 archivos Excel de afiliados
+    archivos_excel = [
+        'afiliados interior geolocalizacion parte 1.xlsx',
+        'afiliados interior geolocalizacion parte 2.xlsx',
+        'afiliados interior geolocalizacion parte 3.xlsx'
+    ]
+    
+    lista_df = []
+    for f in archivos_excel:
+        df_temp = pd.read_excel(f)
+        # Borramos la columna "Fila" si existe en el archivo
+        if 'Fila' in df_temp.columns:
+            df_temp = df_temp.drop(columns=['Fila'])
+        lista_df.append(df_temp)
+    
+    # Unimos uno abajo del otro (1 -> 2 -> 3)
     df_afi_raw = pd.concat(lista_df, ignore_index=True)
+
+    # Estandarizamos nombres de columnas a mayúsculas
     df_afi_raw.columns = df_afi_raw.columns.str.upper().str.strip()
 
     
@@ -75,21 +90,7 @@ def cargar_y_procesar_datos():
     # FILTRO POR PAÍS
     df_cons_raw = df_cons_raw[df_cons_raw['PAIS'] == 'ARGENTINA']
 
-    # --- FUNCIÓN DE LIMPIEZA DEFINITIVA PARA COORDENADAS ---
-    def limpiar_coordenadas(df):
-        for col in ['LATITUD', 'LONGITUD']:
-            if col in df.columns:
-                # Convertimos a string, quitamos espacios/tabs, cambiamos coma por punto
-                df[col] = df[col].astype(str).str.strip().str.replace(',', '.')
-                # Convertimos a número (lo que no se puede, queda como NaN)
-                df[col] = pd.to_numeric(df[col], errors='coerce')
-        return df
-
-    # Limpiamos ambas bases ANTES de cualquier otra operación
-    df_afi_raw = limpiar_coordenadas(df_afi_raw)
-    df_cons_raw = limpiar_coordenadas(df_cons_raw)
-
-    
+     
     # A. Deduplicación y limpieza
     df_afi_clean = df_afi_raw.drop_duplicates(subset=['AFI_ID', 'CALLE', 'NUMERO'])
     
@@ -223,7 +224,7 @@ try:
 
 
 
-    max_dist_data = float(data_mapa_raw['dist_media'].dropna().max()) if not data_mapa_raw['dist_media'].dropna().empty else 100.0
+    max_dist_data = float(data_mapa_raw['dist_media'].dropna().max())
 
     dist_range = st.sidebar.slider("Rango de Distancia Promedio (Km)", 0.0, max_dist_data, (0.0, max_dist_data))
 
@@ -449,9 +450,3 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
-
-
-
-
-
-
