@@ -20,18 +20,20 @@ import pyodbc
 # Función con caché para no conectar a la DB en cada click:
 @st.cache_data
 def cargar_y_procesar_datos():
-    # 1. Carga de archivos
-    archivos_excel = [
+    archivos = [
+        'afiliados interior geolocalizacion parte 1.xlsx',
         'afiliados interior geolocalizacion parte 2.xlsx',
         'afiliados interior geolocalizacion parte 3.xlsx'
     ]
     
     lista_df = []
-    for f in archivos_excel:
+    for f in archivos:
         try:
-            df_temp = pd.read_excel(f)
-            if 'Fila' in df_temp.columns:
-                df_temp = df_temp.drop(columns=['Fila'])
+            # Intentamos Excel, si falla (por ser CSV "disfrazado"), usamos read_csv
+            try:
+                df_temp = pd.read_excel(f)
+            except:
+                df_temp = pd.read_csv(f)
             lista_df.append(df_temp)
         except Exception as e:
             st.warning(f"No se pudo cargar {f}: {e}")
@@ -42,47 +44,46 @@ def cargar_y_procesar_datos():
     df_cons_raw = pd.read_csv('Consultorios GeoLocalizacion (1).csv')
     df_cons_raw.columns = df_cons_raw.columns.str.upper().str.strip()
 
-    # --- FUNCIÓN DE LIMPIEZA DEFINITIVA ---
-    # Esta función quita espacios, cambia comas por puntos y convierte a número
-    def limpiar_coordenadas(serie):
+    # --- LIMPIEZA DE COORDENADAS (SOLUCIÓN AL ERROR FLOAT VS STR) ---
+    def limpiar_columna_coordenada(serie):
+        # 1. Convertimos a string y quitamos espacios
+        # 2. Reemplazamos la coma por el punto (INDISPENSABLE)
+        # 3. pd.to_numeric con errors='coerce' convierte lo que no es número en vacío (NaN)
         return pd.to_numeric(serie.astype(str).str.strip().str.replace(',', '.'), errors='coerce')
 
-    # Aplicamos la limpieza a todas las columnas de coordenadas
-    df_afi_raw['LATITUD'] = limpiar_coordenadas(df_afi_raw['LATITUD'])
-    df_afi_raw['LONGITUD'] = limpiar_coordenadas(df_afi_raw['LONGITUD'])
-    df_cons_raw['LATITUD'] = limpiar_coordenadas(df_cons_raw['LATITUD'])
-    df_cons_raw['LONGITUD'] = limpiar_coordenadas(df_cons_raw['LONGITUD'])
+    # Limpiamos antes de filtrar
+    df_afi_raw['LATITUD'] = limpiar_columna_coordenada(df_afi_raw['LATITUD'])
+    df_afi_raw['LONGITUD'] = limpiar_columna_coordenada(df_afi_raw['LONGITUD'])
+    df_cons_raw['LATITUD'] = limpiar_columna_coordenada(df_cons_raw['LATITUD'])
+    df_cons_raw['LONGITUD'] = limpiar_columna_coordenada(df_cons_raw['LONGITUD'])
 
     # Filtro por país
     df_cons_raw = df_cons_raw[df_cons_raw['PAIS'] == 'ARGENTINA']
-     
-    # A. Deduplicación
+    
     df_afi_clean = df_afi_raw.drop_duplicates(subset=['AFI_ID', 'CALLE', 'NUMERO'])
     
     LAT_MIN, LAT_MAX = -56.0, -21.0
     LON_MIN, LON_MAX = -74.0, -53.0
 
-    # B. Función de filtrado corregida (ya no necesita pd.to_numeric adentro)
     def filtrar_geo(df):
-        # Eliminamos filas que quedaron como NaN tras la limpieza
-        df_solo_num = df.dropna(subset=['LATITUD', 'LONGITUD']).copy()
-        # Ahora la comparación es 100% segura entre números (floats)
-        mask = (df_solo_num['LATITUD'].between(LAT_MIN, LAT_MAX)) & \
-               (df_solo_num['LONGITUD'].between(LON_MIN, LON_MAX))
-        return df_solo_num[mask].copy()
+        # PASO CLAVE: Borramos las filas que no son números (NaN) antes de comparar
+        df_solo_numeros = df.dropna(subset=['LATITUD', 'LONGITUD']).copy()
+        # Ahora la comparación '<' solo ocurre entre números reales
+        mask = (df_solo_numeros['LATITUD'].between(LAT_MIN, LAT_MAX)) & \
+               (df_solo_numeros['LONGITUD'].between(LON_MIN, LON_MAX))
+        return df_solo_numeros[mask].copy()
 
     df_mapa_afi = filtrar_geo(df_afi_clean)
     df_mapa_cons = filtrar_geo(df_cons_raw)
 
-    # C. Cálculo de Distancias
+    # --- El resto del cálculo de distancias y agrupación sigue igual ---
     if not df_mapa_cons.empty and not df_mapa_afi.empty:
         tree = cKDTree(df_mapa_cons[['LATITUD', 'LONGITUD']].values)
         dist, _ = tree.query(df_mapa_afi[['LATITUD', 'LONGITUD']].values, k=1)
-        df_mapa_afi['distancia_km'] = dist * 111.13
+        df_mapa_afi['distancia_km'] = dist * 111.13 
     else:
         df_mapa_afi['distancia_km'] = np.nan
 
-    # D. Agrupación
     resumen_afi = df_mapa_afi.groupby(['LOCALIDAD', 'PROVINCIA']).agg(
         cant_afiliados=('AFI_ID', 'nunique'),
         dist_media=('distancia_km', 'mean'),
@@ -97,17 +98,14 @@ def cargar_y_procesar_datos():
     ).reset_index()
 
     data_final = pd.merge(resumen_afi, resumen_cons, on=['LOCALIDAD', 'PROVINCIA'], how='outer').fillna(0)
-    
     data_final['lat_ref'] = np.where(data_final['lat_ref'] == 0, data_final['lat_cons'], data_final['lat_ref'])
     data_final['lon_ref'] = np.where(data_final['lon_ref'] == 0, data_final['lon_cons'], data_final['lon_ref'])
-
     data_final.loc[data_final['cant_afiliados'] == 0, 'dist_media'] = np.nan
     data_final['cons_por_afi'] = data_final['cant_consultorios'] / data_final['cant_afiliados'].replace(0, np.nan)
-    
     data_final = data_final.drop(columns=['lat_cons', 'lon_cons'])
     
     return data_final, df_afi_clean, df_cons_raw, df_mapa_afi, df_mapa_cons
-
+    
 # --- 3. INTERFAZ Y FILTROS ---
 
 st.title("📍 Tablero de Gestión de Cobertura Sanitaria", anchor=False)
@@ -413,6 +411,7 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
 
 
