@@ -21,7 +21,6 @@ import pyodbc
 @st.cache_data
 def cargar_y_procesar_datos():
     archivos = [
-        'afiliados interior geolocalizacion parte 1.xlsx',
         'afiliados interior geolocalizacion parte 2.xlsx',
         'afiliados interior geolocalizacion parte 3.xlsx'
     ]
@@ -411,6 +410,7 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
 
 
