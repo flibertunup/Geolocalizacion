@@ -72,7 +72,7 @@ def cargar_y_procesar_datos():
     for archivo in archivos_excel:
         try:
             # Leemos el archivo
-            temp_df = pd.read_excel(archivo)
+            temp_df = pd.read_excel(archivo, dtype={'LOCALIDAD': str})
             
             # TRANSFORMACIÓN: Pasamos todos los nombres de columnas a MAYÚSCULAS
             temp_df.columns = temp_df.columns.str.upper()
@@ -88,7 +88,7 @@ def cargar_y_procesar_datos():
         st.error("No se pudieron cargar los archivos de afiliados.")
         return None
         
-    df_cons_raw = pd.read_excel('consultorios geolocalizacion 1.xlsx')
+    df_cons_raw = pd.read_excel('consultorios geolocalizacion 1.xlsx', dtype={'LOCALIDAD': str})
     df_cons_raw.columns = df_cons_raw.columns.str.upper()
     
     # FILTRO POR PAÍS
@@ -454,6 +454,7 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
 
 
