@@ -60,15 +60,6 @@ def formato_miles(valor):
 # --- 2. PROCESAMIENTO DE DATOS ---
 
 @st.cache_data
-def cargar_y_procesar_datos():
-    Para lograr esto, vamos a realizar una transformación dentro del bucle de carga. Utilizaremos el método .rename(columns=str.upper) en cada DataFrame individual antes de unirlos. Esto garantiza que, sin importar cómo vengan en el Excel, siempre se procesen en mayúsculas.
-
-Aquí tienes el bloque de código actualizado para tu función:
-
-Modificación en cargar_y_procesar_datos
-Python
-@st.cache_data
-def cargar_y_procesar_datos():
     # 1. CARGA Y NORMALIZACIÓN DE ARCHIVOS DE AFILIADOS
     archivos_excel = [
         'afiliados interior geolocalizacion parte 1.xlsx',
@@ -462,3 +453,4 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
