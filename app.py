@@ -87,6 +87,17 @@ def cargar_y_procesar_datos():
     
     df_cons_raw = pd.read_csv('Consultorios GeoLocalizacion (1).csv')
 
+    # --- NUEVA FUNCIÓN DE LIMPIEZA PARA EVITAR EL ERROR DE STR VS FLOAT ---
+    def limpiar_num(serie):
+        # Convierte a texto, quita espacios, cambia coma por punto y fuerza a número (NaN si hay error)
+        return pd.to_numeric(serie.astype(str).str.strip().str.replace(',', '.'), errors='coerce')
+
+    # Limpiamos coordenadas en ambas tablas
+    df_afi_raw['LATITUD'] = limpiar_num(df_afi_raw['LATITUD'])
+    df_afi_raw['LONGITUD'] = limpiar_num(df_afi_raw['LONGITUD'])
+    df_cons_raw['LATITUD'] = limpiar_num(df_cons_raw['LATITUD'])
+    df_cons_raw['LONGITUD'] = limpiar_num(df_cons_raw['LONGITUD'])
+    
     # FILTRO POR PAÍS
     df_cons_raw = df_cons_raw[df_cons_raw['PAIS'] == 'ARGENTINA']
 
@@ -224,7 +235,8 @@ try:
 
 
 
-    max_dist_data = float(data_mapa_raw['dist_media'].dropna().max())
+    val_max_dist = data_mapa_raw['dist_media'].dropna()
+    max_dist_data = float(val_max_dist.max()) if not val_max_dist.empty else 100.0
 
     dist_range = st.sidebar.slider("Rango de Distancia Promedio (Km)", 0.0, max_dist_data, (0.0, max_dist_data))
 
@@ -450,3 +462,4 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
