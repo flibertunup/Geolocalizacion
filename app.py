@@ -59,11 +59,10 @@ def formato_miles(valor):
 
 # --- 2. PROCESAMIENTO DE DATOS ---
 
+# --- 2. PROCESAMIENTO DE DATOS ---
+
 @st.cache_data
 def cargar_y_procesar_datos():
-    # Carga de archivos
-
-    # 1. Carga de los 3 archivos Excel de afiliados
     archivos_excel = [
         'afiliados interior geolocalizacion parte 1.xlsx',
         'afiliados interior geolocalizacion parte 2.xlsx',
@@ -72,57 +71,60 @@ def cargar_y_procesar_datos():
     
     lista_df = []
     for f in archivos_excel:
-        df_temp = pd.read_excel(f)
-        # Borramos la columna "Fila" si existe en el archivo
-        if 'Fila' in df_temp.columns:
-            df_temp = df_temp.drop(columns=['Fila'])
-        lista_df.append(df_temp)
+        try:
+            # Intentamos leer el Excel. Si falla, es posible que debas instalar 'openpyxl'
+            df_temp = pd.read_excel(f)
+            if 'Fila' in df_temp.columns:
+                df_temp = df_temp.drop(columns=['Fila'])
+            lista_df.append(df_temp)
+        except:
+            continue
     
-    # Unimos uno abajo del otro (1 -> 2 -> 3)
     df_afi_raw = pd.concat(lista_df, ignore_index=True)
-
-    # Estandarizamos nombres de columnas a mayúsculas
     df_afi_raw.columns = df_afi_raw.columns.str.upper().str.strip()
-
     
     df_cons_raw = pd.read_csv('Consultorios GeoLocalizacion (1).csv')
+    df_cons_raw.columns = df_cons_raw.columns.str.upper().str.strip()
 
-    # --- NUEVA FUNCIÓN DE LIMPIEZA PARA EVITAR EL ERROR DE STR VS FLOAT ---
-    def limpiar_num(serie):
-        # Convierte a texto, quita espacios, cambia coma por punto y fuerza a número (NaN si hay error)
+    # --- FUNCIÓN DE LIMPIEZA DEFINITIVA ---
+    def limpiar_num_pro(serie):
+        # 1. Convertimos a string y quitamos espacios
+        # 2. Reemplazamos coma por punto (Crucial para tus archivos)
+        # 3. Forzamos a numérico, lo que no sea número será NaN
         return pd.to_numeric(serie.astype(str).str.strip().str.replace(',', '.'), errors='coerce')
 
-    # Limpiamos coordenadas en ambas tablas
-    df_afi_raw['LATITUD'] = limpiar_num(df_afi_raw['LATITUD'])
-    df_afi_raw['LONGITUD'] = limpiar_num(df_afi_raw['LONGITUD'])
-    df_cons_raw['LATITUD'] = limpiar_num(df_cons_raw['LATITUD'])
-    df_cons_raw['LONGITUD'] = limpiar_num(df_cons_raw['LONGITUD'])
-    
-    # FILTRO POR PAÍS
-    df_cons_raw = df_cons_raw[df_cons_raw['PAIS'] == 'ARGENTINA']
+    # Aplicamos la limpieza antes de cualquier filtro
+    df_afi_raw['LATITUD'] = limpiar_num_pro(df_afi_raw['LATITUD'])
+    df_afi_raw['LONGITUD'] = limpiar_num_pro(df_afi_raw['LONGITUD'])
+    df_cons_raw['LATITUD'] = limpiar_num_pro(df_cons_raw['LATITUD'])
+    df_cons_raw['LONGITUD'] = limpiar_num_pro(df_cons_raw['LONGITUD'])
 
-     
-    # A. Deduplicación y limpieza
+    # Filtro por país
+    df_cons_raw = df_cons_raw[df_cons_raw['PAIS'] == 'ARGENTINA']
+    
+    # A. Deduplicación
     df_afi_clean = df_afi_raw.drop_duplicates(subset=['AFI_ID', 'CALLE', 'NUMERO'])
     
     LAT_MIN, LAT_MAX = -56.0, -21.0
     LON_MIN, LON_MAX = -74.0, -53.0
 
     def filtrar_geo(df):
-        df['LATITUD'] = pd.to_numeric(df['LATITUD'], errors='coerce')
-        df['LONGITUD'] = pd.to_numeric(df['LONGITUD'], errors='coerce')
-        mask = (df['LATITUD'].between(LAT_MIN, LAT_MAX)) & (df['LONGITUD'].between(LON_MIN, LON_MAX))
-        return df[mask].copy()
+        # Eliminamos filas donde la latitud o longitud sea NaN (evita el error de comparación)
+        df_limpio = df.dropna(subset=['LATITUD', 'LONGITUD']).copy()
+        # Ahora la comparación es segura entre Floats
+        mask = (df_limpio['LATITUD'].between(LAT_MIN, LAT_MAX)) & (df_limpio['LONGITUD'].between(LON_MIN, LON_MAX))
+        return df_limpio[mask].copy()
 
     df_mapa_afi = filtrar_geo(df_afi_clean)
     df_mapa_cons = filtrar_geo(df_cons_raw)
 
     # B. Cálculo de Distancias
+    # Aseguramos que no haya nulos antes de entrar al árbol de búsqueda
     tree = cKDTree(df_mapa_cons[['LATITUD', 'LONGITUD']].values)
     dist, _ = tree.query(df_mapa_afi[['LATITUD', 'LONGITUD']].values, k=1)
     df_mapa_afi['distancia_km'] = dist * 111.13 
 
-    # C. Agrupación
+    # --- El resto de la función (Agrupación C y D) se mantiene igual ---
     resumen_afi = df_mapa_afi.groupby(['LOCALIDAD', 'PROVINCIA']).agg(
         cant_afiliados=('AFI_ID', 'nunique'),
         dist_media=('distancia_km', 'mean'),
@@ -130,28 +132,17 @@ def cargar_y_procesar_datos():
         lon_ref=('LONGITUD', 'mean')
     ).reset_index()
 
-    # Agrupamos consultorios y obtenemos sus coordenadas promedio también
     resumen_cons = df_mapa_cons.groupby(['LOCALIDAD', 'PROVINCIA']).agg(
         cant_consultorios=('LOCALIDAD', 'size'),
         lat_cons=('LATITUD', 'mean'),
         lon_cons=('LONGITUD', 'mean')
     ).reset_index()
 
-    # D. USAMOS MERGE OUTER PARA MOSTRAR TAMBIÉN LOCALIDADES CON CONSULTORIOS SIN AFILIADOS.
-    # Esto asegura que si hay consultorios en una ciudad sin afiliados, la ciudad NO desaparezca.
     data_final = pd.merge(resumen_afi, resumen_cons, on=['LOCALIDAD', 'PROVINCIA'], how='outer').fillna(0)
-    
-    # Consolidamos coordenadas: Si no hay lat_ref (porque no hay afiliados), usamos lat_cons
     data_final['lat_ref'] = np.where(data_final['lat_ref'] == 0, data_final['lat_cons'], data_final['lat_ref'])
     data_final['lon_ref'] = np.where(data_final['lon_ref'] == 0, data_final['lon_cons'], data_final['lon_ref'])
-
-    # Si no hay afiliados, la distancia media no existe (NaN) para que luego se vea como "-"
     data_final.loc[data_final['cant_afiliados'] == 0, 'dist_media'] = np.nan
-    
-    # Cálculo del ratio
     data_final['cons_por_afi'] = data_final['cant_consultorios'] / data_final['cant_afiliados'].replace(0, np.nan)
-    
-    # Limpiamos columnas auxiliares
     data_final = data_final.drop(columns=['lat_cons', 'lon_cons'])
     
     return data_final, df_afi_clean, df_cons_raw, df_mapa_afi, df_mapa_cons
@@ -462,4 +453,5 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
