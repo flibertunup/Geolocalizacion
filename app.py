@@ -18,71 +18,216 @@ import pyodbc
 
 
 # Función con caché para no conectar a la DB en cada click:
-@st.cache_data
+@st.cache_resource
+def conectar_db():
+    return pyodbc.connect('DSN=PostgresUP')
+    
+
+# --- SEGURIDAD ---
+CLAVE_DESARROLLADOR = "admin123" # Cambia esto por tu clave
+
+
+# Configuración de la página
+
+st.set_page_config(page_title="Tablero de Cobertura Geográfica", layout="wide")
+
+
+
+# --- 1. FUNCIONES DE FORMATO ---
+
+def formato_es(valor):
+
+    if pd.isna(valor) or valor == 0: return "0,00"
+
+    return f"{valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+
+
+def formato_porcentaje(parte, total):
+
+    if total == 0: return "0,0 %"
+
+    return f"{(parte / total) * 100:.1f}".replace(".", ",") + " %"
+
+
+
+def formato_miles(valor):
+
+    return f"{int(valor):,}".replace(",", ".")
+
+
+
+# --- 2. PROCESAMIENTO DE DATOS ---
+
 def cargar_y_procesar_datos():
-    archivos = [
-        'afiliados interior geolocalizacion parte 2.xlsx',
-        'afiliados interior geolocalizacion parte 3.xlsx'
-    ]
+    # --- CONEXIÓN Y CARGA SQL ---
+    query_afiliados = """
+    SELECT  
+        af."codigo"        AS "Codigo",
+        af."apellidos"     AS "Apellidos",
+        af."nombres"       AS "Nombres",
+        af."afi_id"        AS "AFI_ID",
+        COALESCE(
+             (SELECT dafi."domiafi_id" FROM "sa_domicilios_afiliado" dafi, "sa_domiafi_td" datd
+              WHERE dafi."afi_afi_id" = af."afi_id" AND dafi."domiafi_id" = datd."domiafi_domiafi_id" AND datd."td_codigo" = 'POST' LIMIT 1),
+             (SELECT dafi."domiafi_id" FROM "sa_domicilios_afiliado" dafi, "sa_domiafi_td" datd
+              WHERE dafi."afi_afi_id" = af."afi_id" AND dafi."domiafi_id" = datd."domiafi_domiafi_id" AND datd."td_codigo" = 'POST' LIMIT 1)
+        ) AS "DOMIAFI_ID",
+        COALESCE(
+             (SELECT dafi."calle" FROM "sa_domicilios_afiliado" dafi, "sa_domiafi_td" datd
+              WHERE dafi."afi_afi_id" = af."afi_id" AND dafi."domiafi_id" = datd."domiafi_domiafi_id" AND datd."td_codigo" = 'POST' LIMIT 1),
+             (SELECT dafi."calle" FROM "sa_domicilios_afiliado" dafi, "sa_domiafi_td" datd
+              WHERE dafi."afi_afi_id" = af."afi_id" AND dafi."domiafi_id" = datd."domiafi_domiafi_id" AND datd."td_codigo" = 'POST' LIMIT 1)
+        ) AS "CALLE",
+        COALESCE(
+             (SELECT dafi."numero" FROM "sa_domicilios_afiliado" dafi, "sa_domiafi_td" datd
+              WHERE dafi."afi_afi_id" = af."afi_id" AND dafi."domiafi_id" = datd."domiafi_domiafi_id" AND datd."td_codigo" = 'POST' LIMIT 1),
+             (SELECT dafi."numero" FROM "sa_domicilios_afiliado" dafi, "sa_domiafi_td" datd
+              WHERE dafi."afi_afi_id" = af."afi_id" AND dafi."domiafi_id" = datd."domiafi_domiafi_id" AND datd."td_codigo" = 'POST' LIMIT 1)
+        ) AS "NUMERO",
+        COALESCE(
+             (SELECT dafi."piso" FROM "sa_domicilios_afiliado" dafi, "sa_domiafi_td" datd
+              WHERE dafi."afi_afi_id" = af."afi_id" AND dafi."domiafi_id" = datd."domiafi_domiafi_id" AND datd."td_codigo" = 'POST' LIMIT 1),
+             (SELECT dafi."piso" FROM "sa_domicilios_afiliado" dafi, "sa_domiafi_td" datd
+              WHERE dafi."afi_afi_id" = af."afi_id" AND dafi."domiafi_id" = datd."domiafi_domiafi_id" AND datd."td_codigo" = 'POST' LIMIT 1)
+        ) AS "PISO",
+        COALESCE(
+             (SELECT dafi."dpto" FROM "sa_domicilios_afiliado" dafi, "sa_domiafi_td" datd
+              WHERE dafi."afi_afi_id" = af."afi_id" AND dafi."domiafi_id" = datd."domiafi_domiafi_id" AND datd."td_codigo" = 'POST' LIMIT 1),
+             (SELECT dafi."dpto" FROM "sa_domicilios_afiliado" dafi, "sa_domiafi_td" datd
+              WHERE dafi."afi_afi_id" = af."afi_id" AND dafi."domiafi_id" = datd."domiafi_domiafi_id" AND datd."td_codigo" = 'POST' LIMIT 1)
+        ) AS "DEPARTAMENTO",
+        COALESCE (
+             (SELECT loc."codigo_postal" FROM "sa_domicilios_afiliado" dafi, "sa_domiafi_td" datd, "sa_localidades" loc
+              WHERE dafi."afi_afi_id" = af."afi_id" AND dafi."domiafi_id" = datd."domiafi_domiafi_id" AND loc."loc_id" = dafi."loc_loc_id" AND datd."td_codigo" = 'POST' LIMIT 1),
+             (SELECT loc."codigo_postal" FROM "sa_domicilios_afiliado" dafi, "sa_domiafi_td" datd, "sa_localidades" loc
+              WHERE dafi."afi_afi_id" = af."afi_id" AND dafi."domiafi_id" = datd."domiafi_domiafi_id" AND loc."loc_id" = dafi."loc_loc_id" AND datd."td_codigo" = 'POST' LIMIT 1)
+        ) AS "CODIGOPOST",
+        COALESCE (
+             (SELECT loc."localidad" FROM "sa_domicilios_afiliado" dafi, "sa_domiafi_td" datd, "sa_localidades" loc
+              WHERE dafi."afi_afi_id" = af."afi_id" AND dafi."domiafi_id" = datd."domiafi_domiafi_id" AND loc."loc_id" = dafi."loc_loc_id" AND datd."td_codigo" = 'POST' LIMIT 1),
+             (SELECT loc."localidad" FROM "sa_domicilios_afiliado" dafi, "sa_domiafi_td" datd, "sa_localidades" loc
+              WHERE dafi."afi_afi_id" = af."afi_id" AND dafi."domiafi_id" = datd."domiafi_domiafi_id" AND loc."loc_id" = dafi."loc_loc_id" AND datd."td_codigo" = 'POST' LIMIT 1)
+        ) AS "LOCALIDAD",
+        COALESCE (
+             (SELECT loc."pcia_codigo" FROM "sa_domicilios_afiliado" dafi, "sa_domiafi_td" datd, "sa_localidades" loc
+              WHERE dafi."afi_afi_id" = af."afi_id" AND dafi."domiafi_id" = datd."domiafi_domiafi_id" AND loc."loc_id" = dafi."loc_loc_id" AND datd."td_codigo" = 'POST' LIMIT 1),
+             (SELECT loc."pcia_codigo" FROM "sa_domicilios_afiliado" dafi, "sa_domiafi_td" datd, "sa_localidades" loc
+              WHERE dafi."afi_afi_id" = af."afi_id" AND dafi."domiafi_id" = datd."domiafi_domiafi_id" AND loc."loc_id" = dafi."loc_loc_id" AND datd."td_codigo" = 'POST' LIMIT 1)
+        ) AS "CODIGO_PROVINCIA",
+        COALESCE (
+             (SELECT p."nombre" FROM "sa_domicilios_afiliado" dafi, "sa_domiafi_td" datd, "sa_localidades" loc, "sa_provincias" p
+              WHERE dafi."afi_afi_id" = af."afi_id" AND dafi."domiafi_id" = datd."domiafi_domiafi_id" AND loc."loc_id" = dafi."loc_loc_id" AND datd."td_codigo" = 'POST' 
+              AND p."codigo" = loc."pcia_codigo" LIMIT 1),
+             (SELECT p."nombre" FROM "sa_domicilios_afiliado" dafi, "sa_domiafi_td" datd, "sa_localidades" loc, "sa_provincias" p
+              WHERE dafi."afi_afi_id" = af."afi_id" AND dafi."domiafi_id" = datd."domiafi_domiafi_id" AND loc."loc_id" = dafi."loc_loc_id" AND datd."td_codigo" = 'POST' 
+              AND p."codigo" = loc."pcia_codigo" LIMIT 1)
+        ) AS "PROVINCIA",   
+        COALESCE (
+             (SELECT pa."nombre" FROM "sa_domicilios_afiliado" dafi, "sa_domiafi_td" datd, "sa_localidades" loc, "sa_provincias" pr, "sa_paises" pa
+              WHERE dafi."afi_afi_id" = af."afi_id" AND dafi."domiafi_id" = datd."domiafi_domiafi_id" AND loc."loc_id" = dafi."loc_loc_id" AND datd."td_codigo" = 'POST'
+              AND pr."codigo" = loc."pcia_codigo" AND pr."pais_codigo" = pa."codigo" LIMIT 1),
+             (SELECT pa."nombre" FROM "sa_domicilios_afiliado" dafi, "sa_domiafi_td" datd, "sa_localidades" loc, "sa_provincias" pr, "sa_paises" pa
+              WHERE dafi."afi_afi_id" = af."afi_id" AND dafi."domiafi_id" = datd."domiafi_domiafi_id" AND loc."loc_id" = dafi."loc_loc_id" AND datd."td_codigo" = 'POST' 
+              AND pr."codigo" = loc."pcia_codigo" AND pr."pais_codigo" = pa."codigo" LIMIT 1)
+        ) AS "PAIS",                       
+        COALESCE(
+             (SELECT dafi."latitud" FROM "sa_domicilios_afiliado" dafi, "sa_domiafi_td" datd
+              WHERE dafi."afi_afi_id" = af."afi_id" AND dafi."domiafi_id" = datd."domiafi_domiafi_id" AND datd."td_codigo" = 'POST' LIMIT 1),
+             (SELECT dafi."latitud" FROM "sa_domicilios_afiliado" dafi, "sa_domiafi_td" datd
+              WHERE dafi."afi_afi_id" = af."afi_id" AND dafi."domiafi_id" = datd."domiafi_domiafi_id" AND datd."td_codigo" = 'POST' LIMIT 1)
+        ) AS "LATITUD",
+        COALESCE(
+             (SELECT dafi."longitud" FROM "sa_domicilios_afiliado" dafi, "sa_domiafi_td" datd
+              WHERE dafi."afi_afi_id" = af."afi_id" AND dafi."domiafi_id" = datd."domiafi_domiafi_id" AND datd."td_codigo" = 'POST' LIMIT 1),
+             (SELECT dafi."longitud" FROM "sa_domicilios_afiliado" dafi, "sa_domiafi_td" datd
+              WHERE dafi."afi_afi_id" = af."afi_id" AND dafi."domiafi_id" = datd."domiafi_domiafi_id" AND datd."td_codigo" = 'POST' LIMIT 1)
+        ) AS "LONGITUD"     
+    FROM "sa_afiliados" af
+    WHERE af."estado" = 'A'
+    ORDER BY af."apellidos", af."nombres";  
+    """
+    # Query de Consultorios (Convertida de Oracle a Postgres)
+    query_consultorios = """
+    SELECT 
+        c."PRES_EFE_CODIGO", c."SECUENCIA", c."USERNAME", c."NOMBRE",
+        d."domicons_id", d."calle", d."numero", d."piso", d."dpto",
+        SUBSTRING(l."CODIGO_POSTAL" FROM 1 FOR 4) AS "CODIGO_POSTAL",
+        d."BARRIO", l."localidad" AS "LOCALIDAD", pr."NOMBRE" AS "PROVINCIA", pa."NOMBRE" AS "PAIS",
+        d."LATITUD", d."longitud" AS "LONGITUD", d."OBSERVACIONES",
+        COALESCE(esp."COD_ESP", 'Sin Dato') AS "COD_ESP",
+        COALESCE(esp."ESPECIALIDAD", 'Sin Dato') AS "ESPECIALIDAD",
+        p."AGPRES_CODIGO" AS "AGRUPACION_PRESTADOR",
+        ap."NOMBRE" AS "DESC_AGRUP_PRESTADOR",
+        e."CE_CODIGO" AS "CLASE_EFECTOR",
+        cle."NOMBRE" AS "DESC_CLASE_EFECTOR",
+        e."AGEFE_CODIGO" AS "AGRUPACION_EFECTOR",
+        age."NOMBRE" AS "DESC_AGRUPACION_EFECTOR",
+        e."VDA_DRV_TIPO_EFECTOR" AS "TIPO_EFECTOR",
+        lv."NOMBRE" AS "DESC_TIPO_EFECTOR",
+        e."CATEFE_CODIGO" AS "CATEGORIA_EFECTOR",
+        ce."NOMBRE" AS "DESC_CATEGORIA_EFECTOR",
+        p."estado" AS "ESTADOPREST", c."estado" AS "ESTADOCONS", e."estado" AS "ESTADOEFECTOR"
+    FROM "SA_CONSULTORIOS" c
+    JOIN "SA_DOMICILIOS_CONSULTORIO" d ON d."CONS_PRES_EFE_CODIGO" = c."PRES_EFE_CODIGO" AND d."CONS_SECUENCIA" = c."SECUENCIA"
+    JOIN "SA_LOCALIDADES" l ON d."loc_loc_id" = l."loc_id"
+    JOIN "SA_PROVINCIAS" pr ON l."PCIA_CODIGO" = pr."CODIGO"
+    JOIN "SA_PAISES" pa ON pr."PAIS_CODIGO" = pa."CODIGO"
+    JOIN "SA_PRESTADORES" p ON c."PRES_EFE_CODIGO" = p."EFE_CODIGO"
+    JOIN "SA_EFECTORES" e ON e."codigo" = p."efe_codigo"
+    LEFT JOIN "SA_AGRUPACIONES_EFECTORES" age ON e."AGEFE_CODIGO" = age."CODIGO"
+    LEFT JOIN "SA_CATEGORIAS_EFECTOR" ce ON e."CATEFE_CODIGO" = ce."CODIGO"
+    LEFT JOIN "SA_CLASES_EFECTOR" cle ON e."CE_CODIGO" = cle."CODIGO"
+    LEFT JOIN "LIBRERIA"."LIB_VALORES_DOMINIO_APP" lv ON e."VDA_DRV_TIPO_EFECTOR" = lv."DRV"
+    LEFT JOIN "SA_AGRUPACIONES_PRESTADORES" ap ON p."AGPRES_CODIGO" = ap."CODIGO"
+    LEFT JOIN (
+        SELECT ep."CODIGO" AS "COD_ESP", ep."NOMBRE" AS "ESPECIALIDAD", epf."EFE_CODIGO"
+        FROM "SA_ESPECIALIDADES" ep
+        JOIN "SA_ESP_PROF" epf ON ep."CODIGO" = epf."ESP_CODIGO"
+    ) esp ON c."PRES_EFE_CODIGO" = esp."EFE_CODIGO"
+    WHERE c."ESTADO" = 'A' AND p."estado" = 'A' AND e."estado" = 'A'
+    ORDER BY 1, 2
+    """  
     
-    lista_df = []
-    for f in archivos:
-        try:
-            # Intentamos Excel, si falla (por ser CSV "disfrazado"), usamos read_csv
-            try:
-                df_temp = pd.read_excel(f)
-            except:
-                df_temp = pd.read_csv(f)
-            lista_df.append(df_temp)
-        except Exception as e:
-            st.warning(f"No se pudo cargar {f}: {e}")
-    
-    df_afi_raw = pd.concat(lista_df, ignore_index=True)
-    df_afi_raw.columns = df_afi_raw.columns.str.upper().str.strip()
+    try:
+        conn = conectar_db()
+        df_afi_raw = pd.read_sql(query_afiliados, conn)
+        df_cons_raw = pd.read_sql(query_consultorios, conn)
+        # conn.close() # Opcional
+    except Exception as e:
+        st.error(f"Error al conectar con la base de datos: {e}")
+        return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
 
-    df_cons_raw = pd.read_csv('Consultorios GeoLocalizacion (1).csv')
-    df_cons_raw.columns = df_cons_raw.columns.str.upper().str.strip()
+    # Aseguramos que los nombres de columnas de consultorios coincidan con el resto del script
+    # (Pasamos a mayúsculas para evitar errores de case-sensitivity en Python)
+    df_cons_raw.columns = [c.upper() for c in df_cons_raw.columns]
+    df_afi_raw.columns = [c.upper() for c in df_afi_raw.columns]
 
-    # --- LIMPIEZA DE COORDENADAS (SOLUCIÓN AL ERROR FLOAT VS STR) ---
-    def limpiar_columna_coordenada(serie):
-        # 1. Convertimos a string y quitamos espacios
-        # 2. Reemplazamos la coma por el punto (INDISPENSABLE)
-        # 3. pd.to_numeric con errors='coerce' convierte lo que no es número en vacío (NaN)
-        return pd.to_numeric(serie.astype(str).str.strip().str.replace(',', '.'), errors='coerce')
-
-    # Limpiamos antes de filtrar
-    df_afi_raw['LATITUD'] = limpiar_columna_coordenada(df_afi_raw['LATITUD'])
-    df_afi_raw['LONGITUD'] = limpiar_columna_coordenada(df_afi_raw['LONGITUD'])
-    df_cons_raw['LATITUD'] = limpiar_columna_coordenada(df_cons_raw['LATITUD'])
-    df_cons_raw['LONGITUD'] = limpiar_columna_coordenada(df_cons_raw['LONGITUD'])
-
-    # Filtro por país
+    # FILTRO POR PAÍS
     df_cons_raw = df_cons_raw[df_cons_raw['PAIS'] == 'ARGENTINA']
+
     
+    # A. Deduplicación y limpieza
     df_afi_clean = df_afi_raw.drop_duplicates(subset=['AFI_ID', 'CALLE', 'NUMERO'])
     
     LAT_MIN, LAT_MAX = -56.0, -21.0
     LON_MIN, LON_MAX = -74.0, -53.0
 
     def filtrar_geo(df):
-        # PASO CLAVE: Borramos las filas que no son números (NaN) antes de comparar
-        df_solo_numeros = df.dropna(subset=['LATITUD', 'LONGITUD']).copy()
-        # Ahora la comparación '<' solo ocurre entre números reales
-        mask = (df_solo_numeros['LATITUD'].between(LAT_MIN, LAT_MAX)) & \
-               (df_solo_numeros['LONGITUD'].between(LON_MIN, LON_MAX))
-        return df_solo_numeros[mask].copy()
+        df['LATITUD'] = pd.to_numeric(df['LATITUD'], errors='coerce')
+        df['LONGITUD'] = pd.to_numeric(df['LONGITUD'], errors='coerce')
+        mask = (df['LATITUD'].between(LAT_MIN, LAT_MAX)) & (df['LONGITUD'].between(LON_MIN, LON_MAX))
+        return df[mask].copy()
 
     df_mapa_afi = filtrar_geo(df_afi_clean)
     df_mapa_cons = filtrar_geo(df_cons_raw)
 
-    # --- El resto del cálculo de distancias y agrupación sigue igual ---
-    if not df_mapa_cons.empty and not df_mapa_afi.empty:
-        tree = cKDTree(df_mapa_cons[['LATITUD', 'LONGITUD']].values)
-        dist, _ = tree.query(df_mapa_afi[['LATITUD', 'LONGITUD']].values, k=1)
-        df_mapa_afi['distancia_km'] = dist * 111.13 
-    else:
-        df_mapa_afi['distancia_km'] = np.nan
+    # B. Cálculo de Distancias
+    tree = cKDTree(df_mapa_cons[['LATITUD', 'LONGITUD']].values)
+    dist, _ = tree.query(df_mapa_afi[['LATITUD', 'LONGITUD']].values, k=1)
+    df_mapa_afi['distancia_km'] = dist * 111.13 
 
+    # C. Agrupación
     resumen_afi = df_mapa_afi.groupby(['LOCALIDAD', 'PROVINCIA']).agg(
         cant_afiliados=('AFI_ID', 'nunique'),
         dist_media=('distancia_km', 'mean'),
@@ -90,21 +235,33 @@ def cargar_y_procesar_datos():
         lon_ref=('LONGITUD', 'mean')
     ).reset_index()
 
+    # Agrupamos consultorios y obtenemos sus coordenadas promedio también
     resumen_cons = df_mapa_cons.groupby(['LOCALIDAD', 'PROVINCIA']).agg(
         cant_consultorios=('LOCALIDAD', 'size'),
         lat_cons=('LATITUD', 'mean'),
         lon_cons=('LONGITUD', 'mean')
     ).reset_index()
 
+    # D. USAMOS MERGE OUTER PARA MOSTRAR TAMBIÉN LOCALIDADES CON CONSULTORIOS SIN AFILIADOS.
+    # Esto asegura que si hay consultorios en una ciudad sin afiliados, la ciudad NO desaparezca.
     data_final = pd.merge(resumen_afi, resumen_cons, on=['LOCALIDAD', 'PROVINCIA'], how='outer').fillna(0)
+    
+    # Consolidamos coordenadas: Si no hay lat_ref (porque no hay afiliados), usamos lat_cons
     data_final['lat_ref'] = np.where(data_final['lat_ref'] == 0, data_final['lat_cons'], data_final['lat_ref'])
     data_final['lon_ref'] = np.where(data_final['lon_ref'] == 0, data_final['lon_cons'], data_final['lon_ref'])
+
+    # Si no hay afiliados, la distancia media no existe (NaN) para que luego se vea como "-"
     data_final.loc[data_final['cant_afiliados'] == 0, 'dist_media'] = np.nan
+    
+    # Cálculo del ratio
     data_final['cons_por_afi'] = data_final['cant_consultorios'] / data_final['cant_afiliados'].replace(0, np.nan)
+    
+    # Limpiamos columnas auxiliares
     data_final = data_final.drop(columns=['lat_cons', 'lon_cons'])
     
     return data_final, df_afi_clean, df_cons_raw, df_mapa_afi, df_mapa_cons
-    
+
+
 # --- 3. INTERFAZ Y FILTROS ---
 
 st.title("📍 Tablero de Gestión de Cobertura Sanitaria", anchor=False)
@@ -183,8 +340,7 @@ try:
 
 
 
-    val_max_dist = data_mapa_raw['dist_media'].dropna()
-    max_dist_data = float(val_max_dist.max()) if not val_max_dist.empty else 100.0
+    max_dist_data = float(data_mapa_raw['dist_media'].dropna().max())
 
     dist_range = st.sidebar.slider("Rango de Distancia Promedio (Km)", 0.0, max_dist_data, (0.0, max_dist_data))
 
@@ -410,9 +566,3 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
-
-
-
-
-
-
