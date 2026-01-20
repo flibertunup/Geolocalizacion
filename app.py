@@ -68,32 +68,32 @@ def cargar_y_procesar_datos():
         af."nombres"        AS "Nombres",
         af."afi_id"        AS "AFI_ID",
         COALESCE(
-             (SELECT dafi."domiafi_id" FROM "view_v_sa_domicilios_afiliados" dafi, "sa_domiafi_td" datd
+             (SELECT dafi."domiafi_id" FROM "v_sa_domicilios_afiliado" dafi, "sa_domiafi_td" datd
               WHERE dafi."afi_afi_id"::text = af."afi_id"::text 
               AND dafi."domiafi_id"::text = datd."domiafi_domiafi_id"::text 
               AND datd."td_codigo" = 'POST' LIMIT 1)
         ) AS "DOMIAFI_ID",
         COALESCE(
-             (SELECT dafi."calle" FROM "view_v_sa_domicilios_afiliados" dafi, "sa_domiafi_td" datd
+             (SELECT dafi."calle" FROM "v_sa_domicilios_afiliado" dafi, "sa_domiafi_td" datd
               WHERE dafi."afi_afi_id"::text = af."afi_id"::text 
               AND dafi."domiafi_id"::text = datd."domiafi_domiafi_id"::text 
               AND datd."td_codigo" = 'POST' LIMIT 1)
         ) AS "CALLE",
         COALESCE(
-             (SELECT dafi."numero" FROM "view_v_sa_domicilios_afiliados" dafi, "sa_domiafi_td" datd
+             (SELECT dafi."numero" FROM "v_sa_domicilios_afiliado" dafi, "sa_domiafi_td" datd
               WHERE dafi."afi_afi_id"::text = af."afi_id"::text 
               AND dafi."domiafi_id"::text = datd."domiafi_domiafi_id"::text 
               AND datd."td_codigo" = 'POST' LIMIT 1)
         ) AS "NUMERO",
         COALESCE (
-             (SELECT loc."localidad" FROM "view_v_sa_domicilios_afiliados" dafi, "sa_domiafi_td" datd, "sa_localidades" loc
+             (SELECT loc."localidad" FROM "v_sa_domicilios_afiliado" dafi, "sa_domiafi_td" datd, "sa_localidades" loc
               WHERE dafi."afi_afi_id"::text = af."afi_id"::text 
               AND dafi."domiafi_id"::text = datd."domiafi_domiafi_id"::text 
               AND loc."loc_id"::text = dafi."loc_loc_id"::text 
               AND datd."td_codigo" = 'POST' LIMIT 1)
         ) AS "LOCALIDAD",
         COALESCE (
-             (SELECT p."nombre" FROM "view_v_sa_domicilios_afiliados" dafi, "sa_domiafi_td" datd, "sa_localidades" loc, "sa_provincias" p
+             (SELECT p."nombre" FROM "v_sa_domicilios_afiliado" dafi, "sa_domiafi_td" datd, "sa_localidades" loc, "sa_provincias" p
               WHERE dafi."afi_afi_id"::text = af."afi_id"::text 
               AND dafi."domiafi_id"::text = datd."domiafi_domiafi_id"::text 
               AND loc."loc_id"::text = dafi."loc_loc_id"::text 
@@ -101,7 +101,7 @@ def cargar_y_procesar_datos():
               AND datd."td_codigo" = 'POST' LIMIT 1)
         ) AS "PROVINCIA",   
         COALESCE (
-             (SELECT pa."nombre" FROM "view_v_sa_domicilios_afiliados" dafi, "sa_domiafi_td" datd, "sa_localidades" loc, "sa_provincias" pr, "sa_paises" pa
+             (SELECT pa."nombre" FROM "v_sa_domicilios_afiliado" dafi, "sa_domiafi_td" datd, "sa_localidades" loc, "sa_provincias" pr, "sa_paises" pa
               WHERE dafi."afi_afi_id"::text = af."afi_id"::text 
               AND dafi."domiafi_id"::text = datd."domiafi_domiafi_id"::text 
               AND loc."loc_id"::text = dafi."loc_loc_id"::text 
@@ -110,13 +110,13 @@ def cargar_y_procesar_datos():
               AND datd."td_codigo" = 'POST' LIMIT 1)
         ) AS "PAIS",                       
         COALESCE(
-             (SELECT dafi."latitud" FROM "view_v_sa_domicilios_afiliados" dafi, "sa_domiafi_td" datd
+             (SELECT dafi."latitud" FROM "v_sa_domicilios_afiliado" dafi, "sa_domiafi_td" datd
               WHERE dafi."afi_afi_id"::text = af."afi_id"::text 
               AND dafi."domiafi_id"::text = datd."domiafi_domiafi_id"::text 
               AND datd."td_codigo" = 'POST' LIMIT 1)
         ) AS "LATITUD",
         COALESCE(
-             (SELECT dafi."longitud" FROM "view_v_sa_domicilios_afiliados" dafi, "sa_domiafi_td" datd
+             (SELECT dafi."longitud" FROM "v_sa_domicilios_afiliado" dafi, "sa_domiafi_td" datd
               WHERE dafi."afi_afi_id"::text = af."afi_id"::text 
               AND dafi."domiafi_id"::text = datd."domiafi_domiafi_id"::text 
               AND datd."td_codigo" = 'POST' LIMIT 1)
@@ -545,6 +545,7 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
 
 
