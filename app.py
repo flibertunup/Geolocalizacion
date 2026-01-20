@@ -61,6 +61,20 @@ def formato_miles(valor):
 
 @st.cache_data
 def cargar_y_procesar_datos():
+    # --- Función interna para rescatar nombres que Excel convirtió en fecha ---
+    def rescatar_nombre_localidad(valor):
+        if pd.isna(valor): return "SIN DATO"
+        # Si Pandas lo leyó como fecha (Timestamp o datetime)
+        if isinstance(valor, (pd.Timestamp, np.datetime64)) or hasattr(valor, 'month'):
+            try:
+                meses = ["", "ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", 
+                         "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"]
+                # Retornamos formato "25 DE MAYO"
+                return f"{valor.day} DE {meses[valor.month]}"
+            except:
+                return str(valor).upper()
+        return str(valor).upper().strip()
+
     # 1. CARGA Y NORMALIZACIÓN DE ARCHIVOS DE AFILIADOS
     archivos_excel = [
         'afiliados interior geolocalizacion parte 1.xlsx',
@@ -71,12 +85,15 @@ def cargar_y_procesar_datos():
     lista_df_afi = []
     for archivo in archivos_excel:
         try:
-            # Leemos el archivo
-            temp_df = pd.read_excel(archivo, dtype={'LOCALIDAD': str})
-            
-            # TRANSFORMACIÓN: Pasamos todos los nombres de columnas a MAYÚSCULAS
+            temp_df = pd.read_excel(archivo)
             temp_df.columns = temp_df.columns.str.upper()
             
+            # Aplicamos el rescate de nombres
+            if 'LOCALIDAD' in temp_df.columns:
+                temp_df['LOCALIDAD'] = temp_df['LOCALIDAD'].apply(rescatar_nombre_localidad)
+            if 'PROVINCIA' in temp_df.columns:
+                temp_df['PROVINCIA'] = temp_df['PROVINCIA'].astype(str).str.upper().fillna("SIN DATO")
+                
             lista_df_afi.append(temp_df)
         except Exception as e:
             st.error(f"Error al leer o procesar {archivo}: {e}")
@@ -84,12 +101,23 @@ def cargar_y_procesar_datos():
     if lista_df_afi:
         df_afi_raw = pd.concat(lista_df_afi, ignore_index=True)
     else:
-        # Fallback en caso de error masivo
-        st.error("No se pudieron cargar los archivos de afiliados.")
         return None
         
-    df_cons_raw = pd.read_excel('consultorios geolocalizacion 1.xlsx', dtype={'LOCALIDAD': str})
-    df_cons_raw.columns = df_cons_raw.columns.str.upper()
+    # 2. CARGA DE CONSULTORIOS
+    try:
+        df_cons_raw = pd.read_excel('consultorios geolocalizacion 1.xlsx')
+        df_cons_raw.columns = df_cons_raw.columns.str.upper()
+        
+        # Aplicamos el rescate de nombres también aquí
+        df_cons_raw['LOCALIDAD'] = df_cons_raw['LOCALIDAD'].apply(rescatar_nombre_localidad)
+        df_cons_raw['PROVINCIA'] = df_cons_raw['PROVINCIA'].astype(str).str.upper().fillna("SIN DATO")
+        
+        # FILTRO POR PAÍS
+        if 'PAIS' in df_cons_raw.columns:
+            df_cons_raw = df_cons_raw[df_cons_raw['PAIS'].astype(str).str.upper() == 'ARGENTINA']
+    except Exception as e:
+        st.error(f"Error en consultorios: {e}")
+        return None
     
     # FILTRO POR PAÍS
     df_cons_raw = df_cons_raw[df_cons_raw['PAIS'] == 'ARGENTINA']
@@ -454,6 +482,7 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
 
 
