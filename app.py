@@ -59,130 +59,46 @@ def formato_miles(valor):
 
 # --- 2. PROCESAMIENTO DE DATOS ---
 
+@st.cache_data
 def cargar_y_procesar_datos():
-    # --- CONEXIÓN Y CARGA SQL ---
-    query_afiliados = """
-    SELECT  
-        af."codigo"        AS "Codigo",
-        af."apellidos"     AS "Apellidos",
-        af."nombres"        AS "Nombres",
-        af."afi_id"        AS "AFI_ID",
-        COALESCE(
-             (SELECT dafi."domiafi_id" FROM "sa_domicilios_afiliado_cleanup" dafi, "sa_domiafi_td" datd
-              WHERE dafi."afi_afi_id"::text = af."afi_id"::text 
-              AND dafi."domiafi_id"::text = datd."domiafi_domiafi_id"::text 
-              AND datd."td_codigo" = 'POST' LIMIT 1)
-        ) AS "DOMIAFI_ID",
-        COALESCE(
-             (SELECT dafi."calle" FROM "sa_domicilios_afiliado_cleanup" dafi, "sa_domiafi_td" datd
-              WHERE dafi."afi_afi_id"::text = af."afi_id"::text 
-              AND dafi."domiafi_id"::text = datd."domiafi_domiafi_id"::text 
-              AND datd."td_codigo" = 'POST' LIMIT 1)
-        ) AS "CALLE",
-        COALESCE(
-             (SELECT dafi."numero" FROM "sa_domicilios_afiliado_cleanup" dafi, "sa_domiafi_td" datd
-              WHERE dafi."afi_afi_id"::text = af."afi_id"::text 
-              AND dafi."domiafi_id"::text = datd."domiafi_domiafi_id"::text 
-              AND datd."td_codigo" = 'POST' LIMIT 1)
-        ) AS "NUMERO",
-        COALESCE (
-             (SELECT loc."localidad" FROM "sa_domicilios_afiliado_cleanup" dafi, "sa_domiafi_td" datd, "sa_localidades" loc
-              WHERE dafi."afi_afi_id"::text = af."afi_id"::text 
-              AND dafi."domiafi_id"::text = datd."domiafi_domiafi_id"::text 
-              AND loc."loc_id"::text = dafi."loc_loc_id"::text 
-              AND datd."td_codigo" = 'POST' LIMIT 1)
-        ) AS "LOCALIDAD",
-        COALESCE (
-             (SELECT p."nombre" FROM "sa_domicilios_afiliado_cleanup" dafi, "sa_domiafi_td" datd, "sa_localidades" loc, "sa_provincias" p
-              WHERE dafi."afi_afi_id"::text = af."afi_id"::text 
-              AND dafi."domiafi_id"::text = datd."domiafi_domiafi_id"::text 
-              AND loc."loc_id"::text = dafi."loc_loc_id"::text 
-              AND p."codigo"::text = loc."pcia_codigo"::text 
-              AND datd."td_codigo" = 'POST' LIMIT 1)
-        ) AS "PROVINCIA",   
-        COALESCE (
-             (SELECT pa."nombre" FROM "sa_domicilios_afiliado_cleanup" dafi, "sa_domiafi_td" datd, "sa_localidades" loc, "sa_provincias" pr, "sa_paises" pa
-              WHERE dafi."afi_afi_id"::text = af."afi_id"::text 
-              AND dafi."domiafi_id"::text = datd."domiafi_domiafi_id"::text 
-              AND loc."loc_id"::text = dafi."loc_loc_id"::text 
-              AND pr."codigo"::text = loc."pcia_codigo"::text 
-              AND pr."pais_codigo"::text = pa."codigo"::text 
-              AND datd."td_codigo" = 'POST' LIMIT 1)
-        ) AS "PAIS",                       
-        COALESCE(
-             (SELECT dafi."latitud" FROM "sa_domicilios_afiliado_cleanup" dafi, "sa_domiafi_td" datd
-              WHERE dafi."afi_afi_id"::text = af."afi_id"::text 
-              AND dafi."domiafi_id"::text = datd."domiafi_domiafi_id"::text 
-              AND datd."td_codigo" = 'POST' LIMIT 1)
-        ) AS "LATITUD",
-        COALESCE(
-             (SELECT dafi."longitud" FROM "sa_domicilios_afiliado_cleanup" dafi, "sa_domiafi_td" datd
-              WHERE dafi."afi_afi_id"::text = af."afi_id"::text 
-              AND dafi."domiafi_id"::text = datd."domiafi_domiafi_id"::text 
-              AND datd."td_codigo" = 'POST' LIMIT 1)
-        ) AS "LONGITUD"     
-    FROM "sa_afiliados" af
-    WHERE af."estado" = 'A'
-    ORDER BY af."apellidos", af."nombres";
+    Para lograr esto, vamos a realizar una transformación dentro del bucle de carga. Utilizaremos el método .rename(columns=str.upper) en cada DataFrame individual antes de unirlos. Esto garantiza que, sin importar cómo vengan en el Excel, siempre se procesen en mayúsculas.
 
+Aquí tienes el bloque de código actualizado para tu función:
 
-    """
-    # Query de Consultorios (Convertida de Oracle a Postgres)
-    query_consultorios = """
-    SELECT 
-        c."PRES_EFE_CODIGO", c."SECUENCIA", c."USERNAME", c."NOMBRE",
-        d."domicons_id", d."calle", d."numero", d."piso", d."dpto",
-        SUBSTRING(l."CODIGO_POSTAL" FROM 1 FOR 4) AS "CODIGO_POSTAL",
-        d."BARRIO", l."localidad" AS "LOCALIDAD", pr."NOMBRE" AS "PROVINCIA", pa."NOMBRE" AS "PAIS",
-        d."LATITUD", d."longitud" AS "LONGITUD", d."OBSERVACIONES",
-        COALESCE(esp."COD_ESP", 'Sin Dato') AS "COD_ESP",
-        COALESCE(esp."ESPECIALIDAD", 'Sin Dato') AS "ESPECIALIDAD",
-        p."AGPRES_CODIGO" AS "AGRUPACION_PRESTADOR",
-        ap."NOMBRE" AS "DESC_AGRUP_PRESTADOR",
-        e."CE_CODIGO" AS "CLASE_EFECTOR",
-        cle."NOMBRE" AS "DESC_CLASE_EFECTOR",
-        e."AGEFE_CODIGO" AS "AGRUPACION_EFECTOR",
-        age."NOMBRE" AS "DESC_AGRUPACION_EFECTOR",
-        e."VDA_DRV_TIPO_EFECTOR" AS "TIPO_EFECTOR",
-        lv."NOMBRE" AS "DESC_TIPO_EFECTOR",
-        e."CATEFE_CODIGO" AS "CATEGORIA_EFECTOR",
-        ce."NOMBRE" AS "DESC_CATEGORIA_EFECTOR",
-        p."estado" AS "ESTADOPREST", c."estado" AS "ESTADOCONS", e."estado" AS "ESTADOEFECTOR"
-    FROM "SA_CONSULTORIOS" c
-    JOIN "SA_DOMICILIOS_CONSULTORIO" d ON d."CONS_PRES_EFE_CODIGO" = c."PRES_EFE_CODIGO" AND d."CONS_SECUENCIA" = c."SECUENCIA"
-    JOIN "SA_LOCALIDADES" l ON d."loc_loc_id" = l."loc_id"
-    JOIN "SA_PROVINCIAS" pr ON l."PCIA_CODIGO" = pr."CODIGO"
-    JOIN "SA_PAISES" pa ON pr."PAIS_CODIGO" = pa."CODIGO"
-    JOIN "SA_PRESTADORES" p ON c."PRES_EFE_CODIGO" = p."EFE_CODIGO"
-    JOIN "SA_EFECTORES" e ON e."codigo" = p."efe_codigo"
-    LEFT JOIN "SA_AGRUPACIONES_EFECTORES" age ON e."AGEFE_CODIGO" = age."CODIGO"
-    LEFT JOIN "SA_CATEGORIAS_EFECTOR" ce ON e."CATEFE_CODIGO" = ce."CODIGO"
-    LEFT JOIN "SA_CLASES_EFECTOR" cle ON e."CE_CODIGO" = cle."CODIGO"
-    LEFT JOIN "LIBRERIA"."LIB_VALORES_DOMINIO_APP" lv ON e."VDA_DRV_TIPO_EFECTOR" = lv."DRV"
-    LEFT JOIN "SA_AGRUPACIONES_PRESTADORES" ap ON p."AGPRES_CODIGO" = ap."CODIGO"
-    LEFT JOIN (
-        SELECT ep."CODIGO" AS "COD_ESP", ep."NOMBRE" AS "ESPECIALIDAD", epf."EFE_CODIGO"
-        FROM "SA_ESPECIALIDADES" ep
-        JOIN "SA_ESP_PROF" epf ON ep."CODIGO" = epf."ESP_CODIGO"
-    ) esp ON c."PRES_EFE_CODIGO" = esp."EFE_CODIGO"
-    WHERE c."ESTADO" = 'A' AND p."estado" = 'A' AND e."estado" = 'A'
-    ORDER BY 1, 2
-    """  
+Modificación en cargar_y_procesar_datos
+Python
+@st.cache_data
+def cargar_y_procesar_datos():
+    # 1. CARGA Y NORMALIZACIÓN DE ARCHIVOS DE AFILIADOS
+    archivos_excel = [
+        'afiliados interior geolocalizacion parte 1.xlsx',
+        'afiliados interior geolocalizacion parte 2.xlsx',
+        'afiliados interior geolocalizacion parte 3.xlsx'
+    ]
     
-    try:
-        conn = conectar_db()
-        df_afi_raw = pd.read_sql(query_afiliados, conn)
-        df_cons_raw = pd.read_sql(query_consultorios, conn)
-        # conn.close() # Opcional
-    except Exception as e:
-        st.error(f"Error al conectar con la base de datos: {e}")
-        return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
-
-    # Aseguramos que los nombres de columnas de consultorios coincidan con el resto del script
-    # (Pasamos a mayúsculas para evitar errores de case-sensitivity en Python)
-    df_cons_raw.columns = [c.upper() for c in df_cons_raw.columns]
-    df_afi_raw.columns = [c.upper() for c in df_afi_raw.columns]
-
+    lista_df_afi = []
+    for archivo in archivos_excel:
+        try:
+            # Leemos el archivo
+            temp_df = pd.read_excel(archivo)
+            
+            # TRANSFORMACIÓN: Pasamos todos los nombres de columnas a MAYÚSCULAS
+            temp_df.columns = temp_df.columns.str.upper()
+            
+            lista_df_afi.append(temp_df)
+        except Exception as e:
+            st.error(f"Error al leer o procesar {archivo}: {e}")
+    
+    if lista_df_afi:
+        df_afi_raw = pd.concat(lista_df_afi, ignore_index=True)
+    else:
+        # Fallback en caso de error masivo
+        st.error("No se pudieron cargar los archivos de afiliados.")
+        return None
+        
+    df_cons_raw = pd.read_csv('Consultorios GeoLocalizacion (1).csv')
+    df_cons_raw.columns = df_cons_raw.columns.str.upper()
+    
     # FILTRO POR PAÍS
     df_cons_raw = df_cons_raw[df_cons_raw['PAIS'] == 'ARGENTINA']
 
@@ -546,9 +462,3 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
-
-
-
-
-
-
