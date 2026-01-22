@@ -250,7 +250,12 @@ try:
         loc_sel = st.sidebar.selectbox("Seleccionar Localidad", list_loc)
     else:
         st.sidebar.info("Seleccione una provincia para filtrar por localidad.")
-        
+
+
+    # Filtro de Especialidad
+    list_esp = ["Todas"] + sorted(cons_base['ESPECIALIDAD'].unique().tolist())
+    esp_sel = st.sidebar.selectbox("Seleccionar Especialidad", list_esp)
+    
 
     tipo_mapa = st.sidebar.radio("Tipo de Vista", ["Marcadores (Localidades)", "Heatmap (Distribución de Afiliados)"])
 
@@ -263,17 +268,57 @@ try:
     
     # --- APLICAR FILTROS EN CADENA ---
     data_filtrada = data_mapa_raw.copy()
+    cons_filtrados = cons_geo_all.copy()
+    afi_filtrados = afi_geo_all.copy()
 
-    # 1. Filtro Provincia
+    # 1. Aplicar filtro de Especialidad a la base de consultorios
+    if esp_sel != "Todas":
+        cons_filtrados = cons_filtrados[cons_filtrados['ESPECIALIDAD'] == esp_sel]
+    
+        # RE-CALCULAR DISTANCIAS: Si filtramos especialidad, la distancia al "más cercano" cambia
+        if not cons_filtrados.empty and not afi_filtrados.empty:
+            tree = cKDTree(cons_filtrados[['LATITUD', 'LONGITUD']].values)
+            dist, _ = tree.query(afi_filtrados[['LATITUD', 'LONGITUD']].values, k=1)
+            afi_filtrados['distancia_km'] = dist * 111.13
+        
+            # Re-agrupar data_filtrada para reflejar la nueva realidad de la especialidad
+            resumen_afi_esp = afi_filtrados.groupby(['LOCALIDAD', 'PROVINCIA']).agg(
+                cant_afiliados=('AFI_ID', 'nunique'),
+                dist_media=('distancia_km', 'mean'),
+                lat_ref=('LATITUD', 'mean'), 
+                lon_ref=('LONGITUD', 'mean')
+            ).reset_index()
+
+        resumen_cons_esp = cons_filtrados.groupby(['LOCALIDAD', 'PROVINCIA']).agg(
+            cant_consultorios=('LOCALIDAD', 'size')
+        ).reset_index()
+
+        data_filtrada = pd.merge(resumen_afi_esp, resumen_cons_esp, on=['LOCALIDAD', 'PROVINCIA'], how='outer').fillna(0)
+        data_filtrada['cons_por_afi'] = data_filtrada['cant_consultorios'] / data_filtrada['cant_afiliados'].replace(0, np.nan)
+
+
+    # --- 1. Filtro Provincia ---
     if prov_sel != "Todas":
+        # Filtramos la tabla resumen (la que va al mapa y tabla inferior)
         data_filtrada = data_filtrada[data_filtrada['PROVINCIA'] == prov_sel]
+    
+        # ESTADÍSTICAS DEL SIDEBAR
+        # Para el "Total Base", usamos las bases crudas filtradas por provincia
         afi_total_stats = len(afi_base[afi_base['PROVINCIA'] == prov_sel])
-        afi_geo_stats = len(afi_geo_all[afi_geo_all['PROVINCIA'] == prov_sel])
         cons_total_stats = len(cons_base[cons_base['PROVINCIA'] == prov_sel])
-        cons_geo_stats = len(cons_geo_all[cons_geo_all['PROVINCIA'] == prov_sel])
+    
+        # Para el "En Mapa", usamos las versiones que YA tienen el filtro de especialidad
+        # y les aplicamos el filtro de provincia ahora.
+        afi_geo_stats = len(afi_filtrados[afi_filtrados['PROVINCIA'] == prov_sel])
+        cons_geo_stats = len(cons_filtrados[cons_filtrados['PROVINCIA'] == prov_sel])
     else:
-        afi_total_stats, afi_geo_stats = len(afi_base), len(afi_geo_all)
-        cons_total_stats, cons_geo_stats = len(cons_base), len(cons_geo_all)
+        # Si no hay provincia seleccionada, las estadísticas son el total de los filtrados
+        afi_total_stats = len(afi_base)
+        cons_total_stats = len(cons_base)
+    
+        afi_geo_stats = len(afi_filtrados) 
+        cons_geo_stats = len(cons_filtrados)
+
 
     # 2. Filtro Localidad
     if loc_sel != "Todas":
@@ -482,6 +527,7 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
 
 
