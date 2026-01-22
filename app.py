@@ -222,6 +222,20 @@ try:
 
     # --- SIDEBAR: FILTROS ---
 
+
+    # Inyectamos el CSS específico para el contenedor 'boton-reset'
+    st.markdown("""
+        <style>
+        div[data-testid="stVerticalBlock"] > div:has(div#boton-reset) button {
+            padding: 0px !important;
+            height: 32px !important;
+            width: 32px !important;
+            min-width: 32px !important;
+            border-radius: 5px;
+            line-height: 32px;
+        }
+        </style>
+    """, unsafe_allow_html=True)
     
     # Creamos dos columnas en el sidebar: 
     # La primera (col_titulo) para el texto, la segunda (col_btn) muy estrecha para el botón.
@@ -535,6 +549,7 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
 
 
