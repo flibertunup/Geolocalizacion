@@ -245,9 +245,10 @@ try:
         st.header("🔍 Filtros")
 
     with col_btn:
-        # Agregamos un margen superior pequeño para alinear el botón con el texto del header
-        st.markdown("<br>", unsafe_allow_html=True) 
+        # Agregamos un margen superior pequeño para alinear el botón con el texto del header 
+        st.markdown('<div id="boton-reset">', unsafe_allow_html=True)
         st.button("🔄", on_click=reiniciar_filtros, help="Reiniciar todos los filtros")
+        st.markdown('</div>', unsafe_allow_html=True)
 
     
     # --- SISTEMA DE ACCESO ---
@@ -549,6 +550,7 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
 
 
