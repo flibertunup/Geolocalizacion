@@ -265,7 +265,7 @@ try:
 
     # Filtro de Especialidad
     list_esp = ["Todas"] + sorted(cons_base['ESPECIALIDAD'].unique().tolist())
-    esp_sel = st.sidebar.selectbox("Seleccionar Especialidad", list_esp, key='especialidad)
+    esp_sel = st.sidebar.selectbox("Seleccionar Especialidad", list_esp, key='especialidad')
     
 
     tipo_mapa = st.sidebar.radio("Tipo de Vista", ["Marcadores (Localidades)", "Heatmap (Distribución de Afiliados)"])
@@ -525,6 +525,7 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
 
 
