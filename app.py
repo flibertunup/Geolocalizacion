@@ -225,7 +225,7 @@ try:
     
     # Creamos dos columnas en el sidebar: 
     # La primera (col_titulo) para el texto, la segunda (col_btn) muy estrecha para el botón.
-    col_titulo, col_btn = st.sidebar.columns([0.85, 0.15])
+    col_titulo, col_btn = st.sidebar.columns([0.85, 0.15], vertical_alignment="center")
 
     with col_titulo:
         st.header("🔍 Filtros de Visualización")
@@ -535,6 +535,7 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
 
 
