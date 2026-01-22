@@ -180,6 +180,15 @@ def cargar_y_procesar_datos():
 
 # --- 3. INTERFAZ Y FILTROS ---
 
+def reiniciar_filtros():
+    st.session_state['provincia'] = "Todas"
+    st.session_state['especialidad'] = "Todas"
+    st.session_state['localidad'] = "Todas"
+    if 'distancia' in st.session_state:
+        # Esto resetea el slider si le pones key='distancia'
+        del st.session_state['distancia']
+
+
 st.title("📍 Tablero de Gestión de Cobertura Sanitaria", anchor=False)
 
 
@@ -235,26 +244,28 @@ try:
         if st.sidebar.button("Cerrar Sesión"):
             st.session_state.es_dev = False
             st.rerun()
-    
+
+    # Botón para reiniciar los filtros. Llama a la función reiniciar_filtros.
+    st.sidebar.button("🔄 Reiniciar Filtros", on_click=reiniciar_filtros)
     
     # Filtro de Provincia
     list_prov = ["Todas"] + sorted(afi_base['PROVINCIA'].unique().tolist())
 
-    prov_sel = st.sidebar.selectbox("Seleccionar Provincia", list_prov)
+    prov_sel = st.sidebar.selectbox("Seleccionar Provincia", list_prov, key='provincia')
 
     # Filtro de Localidad (en cascada)
     loc_sel = "Todas"
     if prov_sel != "Todas":
         # Solo mostramos localidades que pertenecen a la provincia elegida
         list_loc = ["Todas"] + sorted(data_mapa_raw[data_mapa_raw['PROVINCIA'] == prov_sel]['LOCALIDAD'].unique().tolist())
-        loc_sel = st.sidebar.selectbox("Seleccionar Localidad", list_loc)
+        loc_sel = st.sidebar.selectbox("Seleccionar Localidad", list_loc, key='localidad')
     else:
         st.sidebar.info("Seleccione una provincia para filtrar por localidad.")
 
 
     # Filtro de Especialidad
     list_esp = ["Todas"] + sorted(cons_base['ESPECIALIDAD'].unique().tolist())
-    esp_sel = st.sidebar.selectbox("Seleccionar Especialidad", list_esp)
+    esp_sel = st.sidebar.selectbox("Seleccionar Especialidad", list_esp, key='especialidad)
     
 
     tipo_mapa = st.sidebar.radio("Tipo de Vista", ["Marcadores (Localidades)", "Heatmap (Distribución de Afiliados)"])
@@ -263,7 +274,7 @@ try:
 
     max_dist_data = float(data_mapa_raw['dist_media'].dropna().max())
 
-    dist_range = st.sidebar.slider("Rango de Distancia Promedio (Km)", 0.0, max_dist_data, (0.0, max_dist_data))
+    dist_range = st.sidebar.slider("Rango de Distancia Promedio (Km)", 0.0, max_dist_data, (0.0, max_dist_data), key='distancia')
 
     
     # --- APLICAR FILTROS EN CADENA ---
@@ -514,6 +525,7 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
 
 
