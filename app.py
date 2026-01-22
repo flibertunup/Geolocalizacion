@@ -222,8 +222,21 @@ try:
 
     # --- SIDEBAR: FILTROS ---
 
-    st.sidebar.header("🔍 Filtros de Visualización")
+    
+    # Creamos dos columnas en el sidebar: 
+    # La primera (col_titulo) para el texto, la segunda (col_btn) muy estrecha para el botón.
+    col_titulo, col_btn = st.sidebar.columns([0.85, 0.15])
 
+    with col_titulo:
+        st.header("🔍 Filtros de Visualización")
+
+    with col_btn:
+        # Agregamos un margen superior pequeño para alinear el botón con el texto del header
+        st.markdown("<br>", unsafe_allow_html=True) 
+        st.button("🔄", on_click=reiniciar_filtros, help="Reiniciar todos los filtros")
+
+st.sidebar.markdown("---")
+    
     # --- SISTEMA DE ACCESO ---
     st.sidebar.markdown("---")
     # Inicializamos el estado si no existe
@@ -245,8 +258,6 @@ try:
             st.session_state.es_dev = False
             st.rerun()
 
-    # Botón para reiniciar los filtros. Llama a la función reiniciar_filtros.
-    st.sidebar.button("🔄 Reiniciar Filtros", on_click=reiniciar_filtros)
     
     # Filtro de Provincia
     list_prov = ["Todas"] + sorted(afi_base['PROVINCIA'].unique().tolist())
@@ -525,6 +536,7 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
 
 
