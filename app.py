@@ -267,62 +267,64 @@ try:
 
     
     # --- APLICAR FILTROS EN CADENA ---
-    data_filtrada = data_mapa_raw.copy()
-    cons_filtrados = cons_geo_all.copy()
+    # 1. Creamos copias de trabajo para no romper las bases originales
     afi_filtrados = afi_geo_all.copy()
-    afi_base_f = afi_base.copy() # Base total para estadísticas
-    cons_base_f = cons_base.copy() # Base total para estadísticas
+    cons_filtrados = cons_geo_all.copy()
+    afi_base_f = afi_base.copy()
+    cons_base_f = cons_base.copy()
 
-    # 1. Aplicar filtro de Especialidad a la base de consultorios
+    # 2. FILTRO ESPECIALIDAD (Primero, porque afecta el cálculo de distancias)
     if esp_sel != "Todas":
         cons_filtrados = cons_filtrados[cons_filtrados['ESPECIALIDAD'] == esp_sel]
         cons_base_f = cons_base_f[cons_base_f['ESPECIALIDAD'] == esp_sel]
     
-        # RE-CALCULAR DISTANCIAS: Si filtramos especialidad, la distancia al "más cercano" cambia
+        # Si filtramos especialidad, RE-CALCULAMOS la distancia media al consultorio más cercano de ESA especialidad
         if not cons_filtrados.empty and not afi_filtrados.empty:
             tree = cKDTree(cons_filtrados[['LATITUD', 'LONGITUD']].values)
             dist, _ = tree.query(afi_filtrados[['LATITUD', 'LONGITUD']].values, k=1)
             afi_filtrados['distancia_km'] = dist * 111.13
-        
-            # Re-agrupar data_filtrada para reflejar la nueva realidad de la especialidad
-            resumen_afi_esp = afi_filtrados.groupby(['LOCALIDAD', 'PROVINCIA']).agg(
-                cant_afiliados=('AFI_ID', 'nunique'),
-                dist_media=('distancia_km', 'mean'),
-                lat_ref=('LATITUD', 'mean'), 
-                lon_ref=('LONGITUD', 'mean')
-            ).reset_index()
 
-        resumen_cons_esp = cons_filtrados.groupby(['LOCALIDAD', 'PROVINCIA']).agg(
-            cant_consultorios=('LOCALIDAD', 'size')
-        ).reset_index()
-
-        data_filtrada = pd.merge(resumen_afi_esp, resumen_cons_esp, on=['LOCALIDAD', 'PROVINCIA'], how='outer').fillna(0)
-        data_filtrada['cons_por_afi'] = data_filtrada['cant_consultorios'] / data_filtrada['cant_afiliados'].replace(0, np.nan)
-
-
-    # 2. Filtro Provincia
+    # 3. FILTRO PROVINCIA
     if prov_sel != "Todas":
         afi_filtrados = afi_filtrados[afi_filtrados['PROVINCIA'] == prov_sel]
         cons_filtrados = cons_filtrados[cons_filtrados['PROVINCIA'] == prov_sel]
         afi_base_f = afi_base_f[afi_base_f['PROVINCIA'] == prov_sel]
         cons_base_f = cons_base_f[cons_base_f['PROVINCIA'] == prov_sel]
 
-
-    # 3. Filtro Localidad
+    # 4. FILTRO LOCALIDAD
     if loc_sel != "Todas":
         afi_filtrados = afi_filtrados[afi_filtrados['LOCALIDAD'] == loc_sel]
         cons_filtrados = cons_filtrados[cons_filtrados['LOCALIDAD'] == loc_sel]
         afi_base_f = afi_base_f[afi_base_f['LOCALIDAD'] == loc_sel]
         cons_base_f = cons_base_f[cons_base_f['LOCALIDAD'] == loc_sel]
 
+    # 5. CONSTRUCCIÓN DE LA TABLA "data_filtrada" (Resumen por Localidad/Provincia)
+    # Agrupamos los datos YA FILTRADOS por Provincia, Localidad y Especialidad
+    resumen_afi = afi_filtrados.groupby(['LOCALIDAD', 'PROVINCIA']).agg(
+        cant_afiliados=('AFI_ID', 'nunique'),
+        dist_media=('distancia_km', 'mean'),
+        lat_ref=('LATITUD', 'mean'),
+        lon_ref=('LONGITUD', 'mean')
+    ).reset_index()
 
+    resumen_cons = cons_filtrados.groupby(['LOCALIDAD', 'PROVINCIA']).agg(
+        cant_consultorios=('LOCALIDAD', 'size'),
+        lat_cons=('LATITUD', 'mean'),
+        lon_cons=('LONGITUD', 'mean')
+    ).reset_index()
 
-    # Filtro de Distancia
+    # Unimos para tener la vista final
+    data_filtrada = pd.merge(resumen_afi, resumen_cons, on=['LOCALIDAD', 'PROVINCIA'], how='outer').fillna(0)
 
-    # Creamos una máscara que incluya los valores en rango O los valores nulos (0 afiliados)
+    # Consolidación de coordenadas y métricas finales
+    data_filtrada['lat_ref'] = np.where(data_filtrada['lat_ref'] == 0, data_filtrada['lat_cons'], data_filtrada['lat_ref'])
+    data_filtrada['lon_ref'] = np.where(data_filtrada['lon_ref'] == 0, data_filtrada['lon_cons'], data_filtrada['lon_ref'])
+    data_filtrada.loc[data_filtrada['cant_afiliados'] == 0, 'dist_media'] = np.nan
+    data_filtrada['cons_por_afi'] = data_filtrada['cant_consultorios'] / data_filtrada['cant_afiliados'].replace(0, np.nan)
+
+    # 6. FILTRO DE DISTANCIA (Sobre el resumen final)
     mask_distancia = (data_filtrada['dist_media'].between(dist_range[0], dist_range[1])) | (data_filtrada['dist_media'].isna())
     data_filtrada = data_filtrada[mask_distancia]
-
 
 
     # --- SIDEBAR: MÉTRICAS RECALCULADAS ---
@@ -512,6 +514,7 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
 
 
