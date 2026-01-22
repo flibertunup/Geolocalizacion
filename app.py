@@ -235,7 +235,6 @@ try:
         st.markdown("<br>", unsafe_allow_html=True) 
         st.button("🔄", on_click=reiniciar_filtros, help="Reiniciar todos los filtros")
 
-st.sidebar.markdown("---")
     
     # --- SISTEMA DE ACCESO ---
     st.sidebar.markdown("---")
@@ -536,6 +535,7 @@ st.sidebar.markdown("---")
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
 
 
