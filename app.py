@@ -118,10 +118,8 @@ def cargar_y_procesar_datos():
     except Exception as e:
         st.error(f"Error en consultorios: {e}")
         return None
-    
-    # FILTRO POR PAÍS
-    df_cons_raw = df_cons_raw[df_cons_raw['PAIS'] == 'ARGENTINA']
 
+    cons_base = df_cons_raw.copy() # Base completa original
     
     # A. Deduplicación y limpieza
     df_afi_clean = df_afi_raw.drop_duplicates(subset=['AFI_ID', 'CALLE', 'NUMERO'])
@@ -136,12 +134,17 @@ def cargar_y_procesar_datos():
         return df[mask].copy()
 
     df_mapa_afi = filtrar_geo(df_afi_clean)
-    df_mapa_cons = filtrar_geo(df_cons_raw)
+    df_mapa_cons = filtrar_geo(cons_base)
 
+    # SEPARACIÓN LÓGICA (Dentro de cargar_y_procesar_datos)
+    # Filtramos solo lo que NO es farmacia para cálculos médicos
+    cons_geo_only = df_mapa_cons[df_mapa_cons['DESC_TIPO_EFECTOR'] != 'FARMACIA'].copy()
+    
     # B. Cálculo de Distancias
-    tree = cKDTree(df_mapa_cons[['LATITUD', 'LONGITUD']].values)
+    # Usamos 'cons_geo_only' para el árbol de distancias
+    tree = cKDTree(cons_geo_only[['LATITUD', 'LONGITUD']].values)
     dist, _ = tree.query(df_mapa_afi[['LATITUD', 'LONGITUD']].values, k=1)
-    df_mapa_afi['distancia_km'] = dist * 111.13 
+    df_mapa_afi['distancia_km'] = dist * 111.13
 
     # C. Agrupación
     resumen_afi = df_mapa_afi.groupby(['LOCALIDAD', 'PROVINCIA']).agg(
@@ -152,15 +155,26 @@ def cargar_y_procesar_datos():
     ).reset_index()
 
     # Agrupamos consultorios y obtenemos sus coordenadas promedio también
-    resumen_cons = df_mapa_cons.groupby(['LOCALIDAD', 'PROVINCIA']).agg(
+    resumen_cons = cons_geo_only.groupby(['LOCALIDAD', 'PROVINCIA']).agg(
         cant_consultorios=('LOCALIDAD', 'size'),
         lat_cons=('LATITUD', 'mean'),
         lon_cons=('LONGITUD', 'mean')
     ).reset_index()
 
+
+    # Agrupamos farmacias por separado
+    resumen_far = df_mapa_cons[df_mapa_cons['DESC_TIPO_EFECTOR'] == 'FARMACIA'].groupby(['LOCALIDAD', 'PROVINCIA']).size().reset_index(name='cant_farmacias')
+    
     # D. USAMOS MERGE OUTER PARA MOSTRAR TAMBIÉN LOCALIDADES CON CONSULTORIOS SIN AFILIADOS.
     # Esto asegura que si hay consultorios en una ciudad sin afiliados, la ciudad NO desaparezca.
-    data_final = pd.merge(resumen_afi, resumen_cons, on=['LOCALIDAD', 'PROVINCIA'], how='outer').fillna(0)
+    # 1. Unimos Afiliados con Consultorios
+    data_final = pd.merge(resumen_afi, resumen_cons, on=['LOCALIDAD', 'PROVINCIA'], how='outer')
+
+    # 2. Unimos el resultado con Farmacias
+    data_final = pd.merge(data_final, resumen_far, on=['LOCALIDAD', 'PROVINCIA'], how='outer')
+
+    # 3. RELLENAMOS LOS HUECOS (Crucial)
+    data_final = data_final.fillna(0)
     
     # Consolidamos coordenadas: Si no hay lat_ref (porque no hay afiliados), usamos lat_cons
     data_final['lat_ref'] = np.where(data_final['lat_ref'] == 0, data_final['lat_cons'], data_final['lat_ref'])
@@ -175,7 +189,7 @@ def cargar_y_procesar_datos():
     # Limpiamos columnas auxiliares
     data_final = data_final.drop(columns=['lat_cons', 'lon_cons'])
     
-    return data_final, df_afi_clean, df_cons_raw, df_mapa_afi, df_mapa_cons
+    return data_final, df_afi_clean, cons_base, df_mapa_afi, df_mapa_cons
 
 
 # --- 3. INTERFAZ Y FILTROS ---
@@ -304,53 +318,68 @@ try:
     
     # --- APLICAR FILTROS EN CADENA ---
     # 1. Creamos copias de trabajo para no romper las bases originales
-    afi_filtrados = afi_geo_all.copy()
-    cons_filtrados = cons_geo_all.copy()
-    afi_base_f = afi_base.copy()
-    cons_base_f = cons_base.copy()
+    afi_filtrados = afi_geo_all.copy()       # Afiliados con mapa
+    cons_filtrados_all = cons_geo_all.copy() # Prestadores + Farmacias con mapa
+    afi_base_f = afi_base.copy()             # Total Afiliados (para Éxito Geo)
+    cons_base_f = cons_base.copy()           # Total Consultorios (para Éxito Geo)
 
-    # 2. FILTRO ESPECIALIDAD (Primero, porque afecta el cálculo de distancias)
+    # Separamos antes de filtrar especialidad. Esto nos permite que las farmacias no desaparezcan si filtras una especialidad médica
+    cons_médicos = cons_filtrados_all[cons_filtrados_all['DESC_TIPO_EFECTOR'] != 'FARMACIA']
+    farmacias_f = cons_filtrados_all[cons_filtrados_all['DESC_TIPO_EFECTOR'] == 'FARMACIA']
+
+    # 2. FILTRO ESPECIALIDAD: Solo afecta a consultorios (Primero, porque afecta el cálculo de distancias)
     if esp_sel != "Todas":
-        cons_filtrados = cons_filtrados[cons_filtrados['ESPECIALIDAD'] == esp_sel]
-        cons_base_f = cons_base_f[cons_base_f['ESPECIALIDAD'] == esp_sel]
-    
-        # Si filtramos especialidad, RE-CALCULAMOS la distancia media al consultorio más cercano de ESA especialidad
-        if not cons_filtrados.empty and not afi_filtrados.empty:
-            tree = cKDTree(cons_filtrados[['LATITUD', 'LONGITUD']].values)
+        cons_médicos = cons_médicos[cons_médicos['ESPECIALIDAD'] == esp_sel]
+        # Filtramos también la base original de médicos para que el Éxito Geo sea real
+        cons_base_f = cons_base_f[
+            (cons_base_f['ESPECIALIDAD'] == esp_sel) | 
+            (cons_base_f['DESC_TIPO_EFECTOR'] == 'FARMACIA')
+        ]
+        # Recalcular distancia al especialista más cercano (ignora farmacias)
+        if not cons_médicos.empty and not afi_filtrados.empty:
+            tree = cKDTree(cons_médicos[['LATITUD', 'LONGITUD']].values)
             dist, _ = tree.query(afi_filtrados[['LATITUD', 'LONGITUD']].values, k=1)
             afi_filtrados['distancia_km'] = dist * 111.13
 
     # 3. FILTRO PROVINCIA
     if prov_sel != "Todas":
         afi_filtrados = afi_filtrados[afi_filtrados['PROVINCIA'] == prov_sel]
-        cons_filtrados = cons_filtrados[cons_filtrados['PROVINCIA'] == prov_sel]
+        cons_médicos = cons_médicos[cons_médicos['PROVINCIA'] == prov_sel]
+        farmacias_f = farmacias_f[farmacias_f['PROVINCIA'] == prov_sel]
+        # Filtrar bases originales (para que se actualice el Sidebar)
         afi_base_f = afi_base_f[afi_base_f['PROVINCIA'] == prov_sel]
         cons_base_f = cons_base_f[cons_base_f['PROVINCIA'] == prov_sel]
 
     # 4. FILTRO LOCALIDAD
     if loc_sel != "Todas":
+        # Filtrar mapa
         afi_filtrados = afi_filtrados[afi_filtrados['LOCALIDAD'] == loc_sel]
-        cons_filtrados = cons_filtrados[cons_filtrados['LOCALIDAD'] == loc_sel]
+        cons_médicos = cons_médicos[cons_médicos['LOCALIDAD'] == loc_sel]
+        farmacias_f = farmacias_f[farmacias_f['LOCALIDAD'] == loc_sel]
+        # Filtrar bases originales
         afi_base_f = afi_base_f[afi_base_f['LOCALIDAD'] == loc_sel]
         cons_base_f = cons_base_f[cons_base_f['LOCALIDAD'] == loc_sel]
 
     # 5. CONSTRUCCIÓN DE LA TABLA "data_filtrada" (Resumen por Localidad/Provincia)
     # Agrupamos los datos YA FILTRADOS por Provincia, Localidad y Especialidad
-    resumen_afi = afi_filtrados.groupby(['LOCALIDAD', 'PROVINCIA']).agg(
+    res_afi = afi_filtrados.groupby(['LOCALIDAD', 'PROVINCIA']).agg(
         cant_afiliados=('AFI_ID', 'nunique'),
         dist_media=('distancia_km', 'mean'),
         lat_ref=('LATITUD', 'mean'),
         lon_ref=('LONGITUD', 'mean')
     ).reset_index()
 
-    resumen_cons = cons_filtrados.groupby(['LOCALIDAD', 'PROVINCIA']).agg(
+    res_cons = cons_médicos.groupby(['LOCALIDAD', 'PROVINCIA']).agg(
         cant_consultorios=('LOCALIDAD', 'size'),
         lat_cons=('LATITUD', 'mean'),
         lon_cons=('LONGITUD', 'mean')
     ).reset_index()
 
+    res_far = farmacias_f.groupby(['LOCALIDAD', 'PROVINCIA']).size().reset_index(name='cant_farmacias')
+
     # Unimos para tener la vista final
-    data_filtrada = pd.merge(resumen_afi, resumen_cons, on=['LOCALIDAD', 'PROVINCIA'], how='outer').fillna(0)
+    data_filtrada = pd.merge(res_afi, res_cons, on=['LOCALIDAD', 'PROVINCIA'], how='outer')
+    data_filtrada = pd.merge(data_filtrada, res_far, on=['LOCALIDAD', 'PROVINCIA'], how='outer').fillna(0)
 
     # Consolidación de coordenadas y métricas finales
     data_filtrada['lat_ref'] = np.where(data_filtrada['lat_ref'] == 0, data_filtrada['lat_cons'], data_filtrada['lat_ref'])
@@ -387,13 +416,11 @@ try:
 
     # Métricas de Consultorios
     st.sidebar.write(f"**Consultorios ({esp_sel if esp_sel != 'Todas' else 'Totales'})**")
-    st.sidebar.write(f"Total Base Filtrada: {formato_miles(len(cons_base_f))}")
-    st.sidebar.write(f"En Mapa: {formato_miles(len(cons_filtrados))}")
-    st.sidebar.success(f"Éxito Geo: {formato_porcentaje(len(cons_filtrados), len(cons_base_f))}")
-
-
-
-    st.sidebar.markdown("---")
+    # Usamos cons_base_f (que ya tiene los filtros de provincia/localidad/especialidad aplicados)
+    total_base_medicos = len(cons_base_f[cons_base_f['DESC_TIPO_EFECTOR'] != 'FARMACIA'])
+    st.sidebar.write(f"Total Base Filtrada: {formato_miles(total_base_medicos)}")
+    st.sidebar.write(f"En Mapa: {formato_miles(len(cons_médicos))}")
+    st.sidebar.success(f"Éxito Geo: {formato_porcentaje(len(cons_médicos), total_base_medicos)}")
 
     
 
@@ -405,8 +432,20 @@ try:
 
         st.sidebar.metric("Distancia Promedio", f"{formato_es(dist_prom_filtrada)} km")
 
+    
+    st.sidebar.markdown("---")
+
+    # Métricas de Farmacias
+
+    st.sidebar.write(f"**Farmacias**")
+    # Filtramos la base original para contar solo farmacias en la zona elegida
+    total_base_farmacias = len(cons_base_f[cons_base_f['DESC_TIPO_EFECTOR'] == 'FARMACIA'])
+    st.sidebar.write(f"Total Base Filtrada: {formato_miles(total_base_farmacias)}")
+    st.sidebar.write(f"En Mapa: {formato_miles(len(farmacias_f))}")
+    st.sidebar.success(f"Éxito Geo: {formato_porcentaje(len(farmacias_f), total_base_farmacias)}")
 
 
+    
 # --- MAPA CON ZOOM DINÁMICO ---
     if not data_filtrada.empty:
         centro = [data_filtrada['lat_ref'].mean(), data_filtrada['lon_ref'].mean()]
@@ -429,6 +468,7 @@ try:
                     <p style="font-size:12px; color:gray; margin-top:0;">{row['PROVINCIA']}</p>
                     <hr style="margin:5px 0;">
                     <b>Afiliados:</b> {formato_miles(row['cant_afiliados'])}<br>
+                    <b>Farmacias:</b> {formato_miles(row['cant_farmacias'])}<br>
                     <b>Consultorios:</b> {formato_miles(row['cant_consultorios'])}<br>
                     <b>Cons./Afiliados:</b> {formato_es(row['cons_por_afi']) if pd.notna(row['cons_por_afi']) else "-"}<br>
                     <b>Dist. Media:</b> {distancia_label}
@@ -469,19 +509,20 @@ try:
 
     # Preparación de la tabla
 
-    tabla_display = data_filtrada[['LOCALIDAD', 'PROVINCIA', 'cant_afiliados', 'dist_media', 'cant_consultorios', 'cons_por_afi']].copy()
+    tabla_display = data_filtrada[['LOCALIDAD', 'PROVINCIA', 'cant_afiliados', 'cant_farmacias', 'cant_consultorios', 'dist_media', 'cons_por_afi']].copy()
 
     # 2. Renombramos columnas
-    tabla_display.columns = ['Localidad', 'Provincia', 'Afiliados', 'Dist. Media (Km)', 'Consultorios', 'Cons./Afiliados']
+    tabla_display.columns = ['Localidad', 'Provincia', 'Afiliados', 'Farmacias', 'Consultorios', 'Dist. Media (Km)', 'Cons./Afiliados']
 
     # 3. Formateamos las columnas numéricas fijas
-    # Afiliados y Consultorios a entero con punto de miles
+    # Afiliados, Farmacias y Consultorios a entero con punto de miles
     # Distancia Media con coma decimal
 
     df_styled = tabla_display.copy()
 
     # Aplicamos el formato manualmente a las columnas conflictivas para que Streamlit no use "None"
     df_styled['Afiliados'] = df_styled['Afiliados'].apply(lambda x: f"{int(x):,}".replace(",", "."))
+    df_styled['Farmacias'] = df_styled['Farmacias'].apply(lambda x: f"{int(x):,}".replace(",", "."))
     df_styled['Consultorios'] = df_styled['Consultorios'].apply(lambda x: f"{int(x):,}".replace(",", "."))
     df_styled['Dist. Media (Km)'] = df_styled['Dist. Media (Km)'].apply(
     lambda x: "-" if pd.isna(x) else f"{x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
@@ -550,6 +591,7 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
 
 
