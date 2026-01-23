@@ -498,54 +498,54 @@ try:
 
     # --- SECCIÓN DE VISTAS (MAPA + ANÁLISIS) ---
 
-# Creamos las pestañas
-tab_mapa, tab_carencias = st.tabs(["🗺️ Mapa de Cobertura", "🚩 Análisis de Carencias"])
+    # Creamos las pestañas
+    tab_mapa, tab_carencias = st.tabs(["🗺️ Mapa de Cobertura", "🚩 Análisis de Carencias"])
 
-with tab_mapa:
-    # Aquí movemos tu código del mapa que ya tenías
-    st_folium(m, width="100%", height=550, key="mapa_dinamico")
-    st.caption(f"Visualizando datos para: {prov_sel} - {loc_sel}")
+    with tab_mapa:
+        # Aquí movemos tu código del mapa que ya tenías
+        st_folium(m, width="100%", height=550, key="mapa_dinamico")
+        st.caption(f"Visualizando datos para: {prov_sel} - {loc_sel}")
 
-with tab_carencias:
-    st.subheader(f"🚩 Especialidades con Mayor Distancia en {prov_sel}")
+    with tab_carencias:
+        st.subheader(f"🚩 Especialidades con Mayor Distancia en {prov_sel}")
     
-    with st.spinner("Calculando distancias por especialidad..."):
-        # 1. Obtenemos especialidades (excluyendo farmacias y vacíos)
-        base_medica = cons_base_f[cons_base_f['DESC_TIPO_EFECTOR'] != 'FARMACIA']
-        todas_esp = [e for e in base_medica['ESPECIALIDAD'].unique() if str(e) != 'nan' and e != 'SIN DATO']
+        with st.spinner("Calculando distancias por especialidad..."):
+            # 1. Obtenemos especialidades (excluyendo farmacias y vacíos)
+            base_medica = cons_base_f[cons_base_f['DESC_TIPO_EFECTOR'] != 'FARMACIA']
+            todas_esp = [e for e in base_medica['ESPECIALIDAD'].unique() if str(e) != 'nan' and e != 'SIN DATO']
         
-        lista_carencias = []
+            lista_carencias = []
 
-        # 2. Solo calculamos si hay afiliados y médicos en la zona
-        if not afi_filtrados.empty and todas_esp:
-            for esp in todas_esp:
-                # Médicos de esta especialidad con mapa
-                cons_esp = cons_geo_all[cons_geo_all['ESPECIALIDAD'] == esp]
+            # 2. Solo calculamos si hay afiliados y médicos en la zona
+            if not afi_filtrados.empty and todas_esp:
+                for esp in todas_esp:
+                    # Médicos de esta especialidad con mapa
+                    cons_esp = cons_geo_all[cons_geo_all['ESPECIALIDAD'] == esp]
                 
-                # Opcional: Filtrar cons_esp por provincia si quieres que la carencia sea local
-                if prov_sel != "Todas":
-                    cons_esp = cons_esp[cons_esp['PROVINCIA'] == prov_sel]
+                    # Opcional: Filtrar cons_esp por provincia si quieres que la carencia sea local
+                    if prov_sel != "Todas":
+                        cons_esp = cons_esp[cons_esp['PROVINCIA'] == prov_sel]
 
-                if not cons_esp.empty:
-                    tree_esp = cKDTree(cons_esp[['LATITUD', 'LONGITUD']].values)
-                    dist_esp, _ = tree_esp.query(afi_filtrados[['LATITUD', 'LONGITUD']].values, k=1)
-                    dist_km_esp = dist_esp.mean() * 111.13
-                    lista_carencias.append({"Especialidad": esp, "Distancia Promedio (Km)": dist_km_esp})
+                    if not cons_esp.empty:
+                        tree_esp = cKDTree(cons_esp[['LATITUD', 'LONGITUD']].values)
+                        dist_esp, _ = tree_esp.query(afi_filtrados[['LATITUD', 'LONGITUD']].values, k=1)
+                        dist_km_esp = dist_esp.mean() * 111.13
+                        lista_carencias.append({"Especialidad": esp, "Distancia Promedio (Km)": dist_km_esp})
 
-        # 3. Mostrar Gráfico
-        if lista_carencias:
-            df_carencias = pd.DataFrame(lista_carencias).sort_values("Distancia Promedio (Km)", ascending=False).head(10)
+            # 3. Mostrar Gráfico
+            if lista_carencias:
+                df_carencias = pd.DataFrame(lista_carencias).sort_values("Distancia Promedio (Km)", ascending=False).head(10)
             
-            st.bar_chart(
-                df_carencias, 
-                x="Especialidad", 
-                y="Distancia Promedio (Km)", 
-                color="#d62728", # Rojo para resaltar el problema
-                use_container_width=True
-            )
-            st.info("💡 Este gráfico muestra cuánto deben viajar, en promedio, los afiliados de la zona seleccionada para encontrar a cada especialista.")
-        else:
-            st.warning("No hay suficientes datos geolocalizados para generar el ranking de carencias en esta zona.")
+                st.bar_chart(
+                    df_carencias, 
+                    x="Especialidad", 
+                    y="Distancia Promedio (Km)", 
+                    color="#d62728", # Rojo para resaltar el problema
+                    use_container_width=True
+                )
+                st.info("💡 Este gráfico muestra cuánto deben viajar, en promedio, los afiliados de la zona seleccionada para atenderse por especialidad.")
+            else:
+                st.warning("No hay suficientes datos geolocalizados para generar el ranking de carencias en esta zona.")
 
 
 
@@ -640,6 +640,7 @@ with tab_carencias:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
 
 
