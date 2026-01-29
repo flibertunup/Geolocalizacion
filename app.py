@@ -12,6 +12,8 @@ from folium.plugins import HeatMap
 
 from scipy.spatial import cKDTree
 
+import plotly.express as px
+
 import io
 
 import pyodbc
@@ -536,13 +538,25 @@ try:
             if lista_carencias:
                 df_carencias = pd.DataFrame(lista_carencias).sort_values("Distancia Promedio (Km)", ascending=False).head(10)
             
-                st.bar_chart(
+                # Crear gráfico horizontal con Plotly
+                fig = px.bar(
                     df_carencias, 
-                    x="Especialidad", 
-                    y="Distancia Promedio (Km)", 
-                    color="#d62728", # Rojo para resaltar el problema
-                    use_container_width=True
+                    x="Distancia Promedia (Km)", 
+                    y="Especialidad",
+                    orientation='h',
+                    color="Distancia Media (Km)",
+                    color_continuous_scale='Reds',
+                    text_auto='.1f'
                 )
+            
+                fig.update_layout(
+                    yaxis={'categoryorder':'total ascending'},
+                    height=500,
+                    margin=dict(l=20, r=20, t=20, b=20),
+                    coloraxis_showscale=False
+                )
+            
+                st.plotly_chart(fig, use_container_width=True)
                 st.info("💡 Este gráfico muestra cuánto deben viajar, en promedio, los afiliados de la zona seleccionada para atenderse por especialidad.")
             else:
                 st.warning("No hay suficientes datos geolocalizados para generar el ranking de carencias en esta zona.")
@@ -640,6 +654,7 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
 
 
