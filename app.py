@@ -541,7 +541,7 @@ try:
                 # Crear gráfico horizontal con Plotly
                 fig = px.bar(
                     df_carencias, 
-                    x="Distancia Promedia (Km)", 
+                    x="Distancia Promedio (Km)", 
                     y="Especialidad",
                     orientation='h',
                     color="Distancia Media (Km)",
@@ -654,6 +654,7 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
 
 
