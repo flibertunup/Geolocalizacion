@@ -6,5 +6,6 @@ streamlit-folium
 scipy
 pyodbc
 openpyxl # solo para leer excel, borrar después
+plotly
 
 
