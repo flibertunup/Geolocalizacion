@@ -586,7 +586,7 @@ try:
     df_styled['Farmacias'] = df_styled['Farmacias'].apply(lambda x: f"{int(x):,}".replace(",", "."))
     df_styled['Consultorios'] = df_styled['Consultorios'].apply(lambda x: f"{int(x):,}".replace(",", "."))
     df_styled['Dist. Media (Km)'] = df_styled['Dist. Media (Km)'].apply(
-    lambda x: "-" if pd.isna(x) else f"{x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    lambda x: "-" if pd.isna(x) else f"{x:,.1f}".replace(",", "X").replace(".", ",").replace("X", ".")
 )
 
     # LA CLAVE: Forzamos el guion en la columna Afiliados/Cons. antes de pasar al dataframe
@@ -652,6 +652,7 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
 
 
