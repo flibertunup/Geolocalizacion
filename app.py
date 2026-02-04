@@ -258,7 +258,7 @@ try:
     col_titulo, col_btn = st.sidebar.columns([0.8, 0.2], vertical_alignment="center")
 
     with col_titulo:
-        st.header("🔍 Filtros")
+        st.header("🔍 Filtros de Visualización")
 
     with col_btn:
         # Agregamos un margen superior pequeño para alinear el botón con el texto del header 
@@ -659,6 +659,7 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
 
 
