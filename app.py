@@ -531,7 +531,12 @@ try:
                         tree_esp = cKDTree(cons_esp[['LATITUD', 'LONGITUD']].values)
                         dist_esp, _ = tree_esp.query(afi_filtrados[['LATITUD', 'LONGITUD']].values, k=1)
                         dist_km_esp = dist_esp.mean() * 111.13
-                        lista_carencias.append({"Especialidad": esp, "Distancia Promedio (Km)": dist_km_esp})
+                        # Aplicamos el filtro del slider para mantener consistencia con la tabla
+                        if dist_range[0] <= dist_km_esp <= dist_range[1]:
+                            lista_carencias.append({
+                                "Especialidad": esp, 
+                                "Distancia Promedio (Km)": dist_km_esp
+                            })
 
             # 3. Mostrar Gráfico
             if lista_carencias:
@@ -654,6 +659,7 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
 
 
