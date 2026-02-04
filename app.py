@@ -552,7 +552,7 @@ try:
                     yaxis={'categoryorder':'total ascending'},
                     height=500,
                     margin=dict(l=20, r=20, t=20, b=20),
-                    coloraxis_showscale=False
+                    coloraxis_showscale=False,
                     font=dict(family="Arial", size=12, color="#000661")
                 )
             
@@ -654,6 +654,7 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
 
 
