@@ -521,12 +521,10 @@ try:
             # 2. Solo calculamos si hay afiliados y médicos en la zona
             if not afi_filtrados.empty and todas_esp:
                 for esp in todas_esp:
+                    if esp_sel != "Todas" and esp != esp_sel:
+                        continue
                     # Médicos de esta especialidad con mapa
                     cons_esp = cons_geo_all[cons_geo_all['ESPECIALIDAD'] == esp]
-                
-                    # Opcional: Filtrar cons_esp por provincia si quieres que la carencia sea local
-                    if prov_sel != "Todas":
-                        cons_esp = cons_esp[cons_esp['PROVINCIA'] == prov_sel]
 
                     if not cons_esp.empty:
                         tree_esp = cKDTree(cons_esp[['LATITUD', 'LONGITUD']].values)
@@ -654,6 +652,7 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
 
 
