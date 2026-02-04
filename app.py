@@ -41,7 +41,7 @@ def formato_es(valor):
 
     if pd.isna(valor) or valor == 0: return "0,00"
 
-    return f"{valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    return f"{valor:,.1f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 
 
@@ -652,6 +652,7 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
 
 
