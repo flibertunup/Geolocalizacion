@@ -501,7 +501,7 @@ try:
     # --- SECCIÓN DE VISTAS (MAPA + ANÁLISIS) ---
 
     # Creamos las pestañas
-    tab_mapa, tab_carencias = st.tabs(["🗺️ Mapa de Cobertura", "🚩 Análisis de Carencias"])
+    tab_mapa, tab_carencias = st.tabs(["Mapa de Cobertura", "Análisis de Carencias"])
 
     with tab_mapa:
         # Aquí movemos tu código del mapa que ya tenías
@@ -654,6 +654,7 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
 
 
