@@ -544,14 +544,16 @@ try:
                     x="Distancia Promedio (Km)", 
                     y="Especialidad",
                     orientation='h',
+                    color="Distancia Promedio (Km)",
+                    color_continuous_scale=[[0, '#8083b0'], [1, 'rgb(0, 6, 97)']], # Escala hacia tu logo
                     text_auto='.1f'
                 )
-                fig.update_traces(marker_color='rgb(0, 6, 97)')
                 fig.update_layout(
                     yaxis={'categoryorder':'total ascending'},
                     height=500,
                     margin=dict(l=20, r=20, t=20, b=20),
                     coloraxis_showscale=False
+                    font=dict(family="Arial", size=12, color="#000661")
                 )
             
                 st.plotly_chart(fig, use_container_width=True)
@@ -652,6 +654,7 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
 
 
