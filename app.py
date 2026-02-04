@@ -509,7 +509,7 @@ try:
         st.caption(f"Visualizando datos para: {prov_sel} - {loc_sel}")
 
     with tab_carencias:
-        st.subheader(f"🚩 Especialidades con Mayor Distancia en {prov_sel}")
+        st.subheader(f"Especialidades con Mayor Distancia en {prov_sel}")
     
         with st.spinner("Calculando distancias por especialidad..."):
             # 1. Obtenemos especialidades (excluyendo farmacias y vacíos)
@@ -654,6 +654,7 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
 
 
