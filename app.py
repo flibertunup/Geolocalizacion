@@ -549,7 +549,7 @@ try:
                 )
                 fig.update_layout(
                     yaxis={'categoryorder':'total ascending'},
-                    height=max(400, len(df_carencias) * 40),
+                    height=500,
                     margin=dict(l=20, r=20, t=20, b=20),
                     coloraxis_showscale=False,
                     yaxis_title=None,
@@ -654,6 +654,7 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
 
 
