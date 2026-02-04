@@ -544,11 +544,9 @@ try:
                     x="Distancia Promedio (Km)", 
                     y="Especialidad",
                     orientation='h',
-                    color="Distancia Promedio (Km)",
-                    color_continuous_scale='Reds',
                     text_auto='.1f'
                 )
-            
+                fig.update_traces(marker_color='rgb(0, 6, 97)')
                 fig.update_layout(
                     yaxis={'categoryorder':'total ascending'},
                     height=500,
@@ -654,6 +652,7 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
 
 
