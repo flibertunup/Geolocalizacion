@@ -509,7 +509,8 @@ try:
         st.caption(f"Visualizando datos para: {prov_sel} - {loc_sel}")
 
     with tab_carencias:
-        st.subheader(f"Especialidades con Mayor Distancia en {prov_sel}")
+        ubicacion_tit = prov_sel if loc_sel == "Todas" else f"{loc_sel}, {prov_sel}"
+        st.subheader(f"Especialidades con Mayor Distancia en {ubicacion_tit}")
     
         with st.spinner("Calculando distancias por especialidad..."):
             # 1. Obtenemos especialidades (excluyendo farmacias y vacíos)
@@ -548,9 +549,10 @@ try:
                 )
                 fig.update_layout(
                     yaxis={'categoryorder':'total ascending'},
-                    height=500,
+                    height=max(400, len(df_carencias) * 40),
                     margin=dict(l=20, r=20, t=20, b=20),
                     coloraxis_showscale=False,
+                    yaxis_title=None,
                     font=dict(family="Arial", size=12, color="#000661")
                 )
             
@@ -652,6 +654,7 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
 
 
