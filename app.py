@@ -1,63 +1,36 @@
 import streamlit as st
-
 import pandas as pd
-
 import numpy as np
-
 import folium
-
 from streamlit_folium import st_folium
-
 from folium.plugins import HeatMap
-
 from scipy.spatial import cKDTree
-
 import plotly.express as px
-
 import io
-
 import pyodbc
-
 
 # Función con caché para no conectar a la DB en cada click:
 @st.cache_resource
 def conectar_db():
     return pyodbc.connect('DSN=PostgresUP')
     
-
 # --- SEGURIDAD ---
 CLAVE_DESARROLLADOR = "admin123" # Cambia esto por tu clave
 
-
 # Configuración de la página
-
 st.set_page_config(page_title="Tablero de Cobertura Geográfica", layout="wide")
 
-
-
 # --- 1. FUNCIONES DE FORMATO ---
-
 def formato_es(valor):
-
     if pd.isna(valor) or valor == 0: return "0,00"
-
     return f"{valor:,.1f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
-
-
 def formato_porcentaje(parte, total):
-
     if total == 0: return "0,0 %"
-
     return f"{(parte / total) * 100:.1f}".replace(".", ",") + " %"
 
-
-
 def formato_miles(valor):
-
     return f"{int(valor):,}".replace(",", ".")
-
-
 
 # --- 2. PROCESAMIENTO DE DATOS ---
 
@@ -659,6 +632,7 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
 
 
