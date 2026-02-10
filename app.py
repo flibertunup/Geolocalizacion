@@ -120,51 +120,8 @@ def cargar_y_procesar_datos():
     tree = cKDTree(cons_geo_only[['LATITUD', 'LONGITUD']].values)
     dist, _ = tree.query(df_mapa_afi[['LATITUD', 'LONGITUD']].values, k=1)
     df_mapa_afi['distancia_km'] = dist * 111.13
-
-    # C. Agrupación
-    resumen_afi = df_mapa_afi.groupby(['LOCALIDAD', 'PROVINCIA']).agg(
-        cant_afiliados=('AFI_ID', 'nunique'),
-        dist_media=('distancia_km', 'mean'),
-        lat_ref=('LATITUD', 'mean'), 
-        lon_ref=('LONGITUD', 'mean')
-    ).reset_index()
-
-    # Agrupamos consultorios y obtenemos sus coordenadas promedio también
-    resumen_cons = cons_geo_only.groupby(['LOCALIDAD', 'PROVINCIA']).agg(
-        cant_consultorios=('LOCALIDAD', 'size'),
-        lat_cons=('LATITUD', 'mean'),
-        lon_cons=('LONGITUD', 'mean')
-    ).reset_index()
-
-
-    # Agrupamos farmacias por separado
-    resumen_far = df_mapa_cons[df_mapa_cons['DESC_TIPO_EFECTOR'] == 'FARMACIA'].groupby(['LOCALIDAD', 'PROVINCIA']).size().reset_index(name='cant_farmacias')
     
-    # D. USAMOS MERGE OUTER PARA MOSTRAR TAMBIÉN LOCALIDADES CON CONSULTORIOS SIN AFILIADOS.
-    # Esto asegura que si hay consultorios en una ciudad sin afiliados, la ciudad NO desaparezca.
-    # 1. Unimos Afiliados con Consultorios
-    data_final = pd.merge(resumen_afi, resumen_cons, on=['LOCALIDAD', 'PROVINCIA'], how='outer')
-
-    # 2. Unimos el resultado con Farmacias
-    data_final = pd.merge(data_final, resumen_far, on=['LOCALIDAD', 'PROVINCIA'], how='outer')
-
-    # 3. RELLENAMOS LOS HUECOS (Crucial)
-    data_final = data_final.fillna(0)
-    
-    # Consolidamos coordenadas: Si no hay lat_ref (porque no hay afiliados), usamos lat_cons
-    data_final['lat_ref'] = np.where(data_final['lat_ref'] == 0, data_final['lat_cons'], data_final['lat_ref'])
-    data_final['lon_ref'] = np.where(data_final['lon_ref'] == 0, data_final['lon_cons'], data_final['lon_ref'])
-
-    # Si no hay afiliados, la distancia media no existe (NaN) para que luego se vea como "-"
-    data_final.loc[data_final['cant_afiliados'] == 0, 'dist_media'] = np.nan
-    
-    # Cálculo del ratio
-    data_final['cons_por_afi'] = data_final['cant_consultorios'] / data_final['cant_afiliados'].replace(0, np.nan)
-    
-    # Limpiamos columnas auxiliares
-    data_final = data_final.drop(columns=['lat_cons', 'lon_cons'])
-    
-    return data_final, df_afi_clean, cons_base, df_mapa_afi, df_mapa_cons
+    return df_afi_clean, cons_base, df_mapa_afi, df_mapa_cons
 
 
 # --- 3. INTERFAZ Y FILTROS ---
@@ -205,7 +162,7 @@ with st.expander("❓ ¿Cómo usar este tablero y qué significan las métricas?
 
 try:
 
-    data_mapa_raw, afi_base, cons_base, afi_geo_all, cons_geo_all = cargar_y_procesar_datos()
+    afi_base, cons_base, afi_geo_all, cons_geo_all = cargar_y_procesar_datos()
 
 
 
@@ -271,7 +228,7 @@ try:
     loc_sel = "Todas"
     if prov_sel != "Todas":
         # Solo mostramos localidades que pertenecen a la provincia elegida
-        list_loc = ["Todas"] + sorted(data_mapa_raw[data_mapa_raw['PROVINCIA'] == prov_sel]['LOCALIDAD'].unique().tolist())
+        list_loc = ["Todas"] + sorted(afi_geo_all[afi_geo_all['PROVINCIA'] == prov_sel]['LOCALIDAD'].unique().tolist())
         loc_sel = st.sidebar.selectbox("Seleccionar Localidad", list_loc, key='localidad')
     else:
         st.sidebar.info("Seleccione una provincia para filtrar por localidad.")
@@ -280,13 +237,12 @@ try:
     # Filtro de Especialidad
     list_esp = ["Todas"] + sorted(cons_base['ESPECIALIDAD'].unique().tolist())
     esp_sel = st.sidebar.selectbox("Seleccionar Especialidad", list_esp, key='especialidad')
-    
 
     tipo_mapa = st.sidebar.radio("Tipo de Vista", ["Marcadores (Localidades)", "Heatmap (Distribución de Afiliados)"])
 
-
-
-    max_dist_data = float(data_mapa_raw['dist_media'].dropna().max())
+    # Usamos el máximo de la distancia media por localidad para que el slider sea coherente
+    max_dist_data = float(afi_geo_all.groupby(['LOCALIDAD', 'PROVINCIA'])['distancia_km'].mean().dropna().max()) 
+    if np.isnan(max_dist_data): max_dist_data = 100.0 # Valor por defecto por seguridad
 
     dist_range = st.sidebar.slider("Rango de Distancia Promedio (Km)", 0.0, max_dist_data, (0.0, max_dist_data), key='distancia')
 
@@ -471,76 +427,9 @@ try:
         heat_data = [[row['lat_ref'], row['lon_ref'], row['cant_afiliados']] for _, row in data_filtrada.iterrows()]
         HeatMap(heat_data, radius=15, blur=10).add_to(m)
 
-    # --- SECCIÓN DE VISTAS (MAPA + ANÁLISIS) ---
+    st_folium(m, width="100%", height=550, key="mapa_dinamico")
 
-    # Creamos las pestañas
-    tab_mapa, tab_carencias = st.tabs(["Mapa de Cobertura", "Análisis de Carencias"])
-
-    with tab_mapa:
-        # Aquí movemos tu código del mapa que ya tenías
-        st_folium(m, width="100%", height=550, key="mapa_dinamico")
-        st.caption(f"Visualizando datos para: {prov_sel} - {loc_sel}")
-
-    with tab_carencias:
-        ubicacion_tit = prov_sel if loc_sel == "Todas" else f"{loc_sel}, {prov_sel}"
-        st.subheader(f"Especialidades con Mayor Distancia en {ubicacion_tit}")
     
-        with st.spinner("Calculando distancias por especialidad..."):
-            # 1. Obtenemos especialidades (excluyendo farmacias y vacíos)
-            base_medica = cons_base_f[cons_base_f['DESC_TIPO_EFECTOR'] != 'FARMACIA']
-            todas_esp = [e for e in base_medica['ESPECIALIDAD'].unique() if str(e) != 'nan' and e != 'SIN DATO']
-        
-            lista_carencias = []
-
-            # 2. Solo calculamos si hay afiliados y médicos en la zona
-            if not afi_filtrados.empty and todas_esp:
-                for esp in todas_esp:
-                    if esp_sel != "Todas" and esp != esp_sel:
-                        continue
-                    # Médicos de esta especialidad con mapa
-                    cons_esp = cons_geo_all[cons_geo_all['ESPECIALIDAD'] == esp]
-
-                    if not cons_esp.empty:
-                        tree_esp = cKDTree(cons_esp[['LATITUD', 'LONGITUD']].values)
-                        dist_esp, _ = tree_esp.query(afi_filtrados[['LATITUD', 'LONGITUD']].values, k=1)
-                        dist_km_esp = dist_esp.mean() * 111.13
-                        # Aplicamos el filtro del slider para mantener consistencia con la tabla
-                        if dist_range[0] <= dist_km_esp <= dist_range[1]:
-                            lista_carencias.append({
-                                "Especialidad": esp, 
-                                "Distancia Promedio (Km)": dist_km_esp
-                            })
-
-            # 3. Mostrar Gráfico
-            if lista_carencias:
-                df_carencias = pd.DataFrame(lista_carencias).sort_values("Distancia Promedio (Km)", ascending=False).head(10)
-            
-                # Crear gráfico horizontal con Plotly
-                fig = px.bar(
-                    df_carencias, 
-                    x="Distancia Promedio (Km)", 
-                    y="Especialidad",
-                    orientation='h',
-                    color="Distancia Promedio (Km)",
-                    color_continuous_scale=[[0, '#8083b0'], [1, 'rgb(0, 6, 97)']], # Escala hacia tu logo
-                    text_auto='.1f'
-                )
-                fig.update_layout(
-                    yaxis={'categoryorder':'total ascending'},
-                    height=500,
-                    margin=dict(l=20, r=20, t=20, b=20),
-                    coloraxis_showscale=False,
-                    yaxis_title=None,
-                    font=dict(family="Arial", size=12, color="#000661")
-                )
-            
-                st.plotly_chart(fig, use_container_width=True)
-                st.info("💡 Este gráfico muestra cuánto deben viajar, en promedio, los afiliados de la zona seleccionada para atenderse por especialidad.")
-            else:
-                st.warning("No hay suficientes datos geolocalizados para generar el ranking de carencias en esta zona.")
-
-
-
     # --- TABLA DE DATOS ---
 
     st.markdown("---")
@@ -632,38 +521,6 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
