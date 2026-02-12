@@ -5,7 +5,6 @@ import folium
 from streamlit_folium import st_folium
 from folium.plugins import HeatMap
 from scipy.spatial import cKDTree
-import plotly.express as px
 import io
 import pyodbc
 
@@ -521,6 +520,7 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
 
 
