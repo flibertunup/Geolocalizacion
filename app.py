@@ -35,149 +35,67 @@ def formato_miles(valor):
 
 @st.cache_data
 def cargar_y_procesar_datos():
-    # --- QUERIES SQL (Tus consultas de Postgres) ---
-    query_afiliados = """
-    SELECT  
-        af."codigo"         AS "Codigo",
-        af."apellidos"      AS "Apellidos",
-        af."nombres"        AS "Nombres",
-        af."afi_id"         AS "AFI_ID",
-        COALESCE(
-             (SELECT dafi."domiafi_id" FROM "v_sa_domicilios_afiliado" dafi, "sa_domiafi_td" datd
-              WHERE dafi."afi_afi_id"::text = af."afi_id"::text AND dafi."domiafi_id"::text = datd."domiafi_domiafi_id"::text AND datd."td_codigo" = 'POST' LIMIT 1),
-             (SELECT dafi."domiafi_id" FROM "v_sa_domicilios_afiliado" dafi, "sa_domiafi_td" datd
-              WHERE dafi."afi_afi_id"::text = af."afi_id"::text AND dafi."domiafi_id"::text = datd."domiafi_domiafi_id"::text AND datd."td_codigo" = 'POST' LIMIT 1)
-        ) AS "DOMIAFI_ID",
-        COALESCE(
-             (SELECT dafi."calle" FROM "v_sa_domicilios_afiliado" dafi, "sa_domiafi_td" datd
-              WHERE dafi."afi_afi_id"::text = af."afi_id"::text AND dafi."domiafi_id"::text = datd."domiafi_domiafi_id"::text AND datd."td_codigo" = 'POST' LIMIT 1),
-             (SELECT dafi."calle" FROM "v_sa_domicilios_afiliado" dafi, "sa_domiafi_td" datd
-              WHERE dafi."afi_afi_id"::text = af."afi_id"::text AND dafi."domiafi_id"::text = datd."domiafi_domiafi_id"::text AND datd."td_codigo" = 'POST' LIMIT 1)
-        ) AS "CALLE",
-        COALESCE(
-             (SELECT dafi."numero" FROM "v_sa_domicilios_afiliado" dafi, "sa_domiafi_td" datd
-              WHERE dafi."afi_afi_id"::text = af."afi_id"::text AND dafi."domiafi_id"::text = datd."domiafi_domiafi_id"::text AND datd."td_codigo" = 'POST' LIMIT 1),
-             (SELECT dafi."numero" FROM "v_sa_domicilios_afiliado" dafi, "sa_domiafi_td" datd
-              WHERE dafi."afi_afi_id"::text = af."afi_id"::text AND dafi."domiafi_id"::text = datd."domiafi_domiafi_id"::text AND datd."td_codigo" = 'POST' LIMIT 1)
-        ) AS "NUMERO",
-        COALESCE (
-             (SELECT loc."localidad" FROM "v_sa_domicilios_afiliado" dafi, "sa_domiafi_td" datd, "sa_localidades" loc
-              WHERE dafi."afi_afi_id"::text = af."afi_id"::text AND dafi."domiafi_id"::text = datd."domiafi_domiafi_id"::text AND loc."loc_id"::text = dafi."loc_loc_id"::text AND datd."td_codigo" = 'POST' LIMIT 1),
-             (SELECT loc."localidad" FROM "sa_domicilios_afiliado" dafi, "sa_domiafi_td" datd, "sa_localidades" loc
-              WHERE dafi."afi_afi_id"::text = af."afi_id"::text AND dafi."domiafi_id"::text = datd."domiafi_domiafi_id"::text AND loc."loc_id"::text = dafi."loc_loc_id"::text AND datd."td_codigo" = 'POST' LIMIT 1)
-        ) AS "LOCALIDAD",
-        COALESCE (
-             (SELECT p."nombre" FROM "v_sa_domicilios_afiliado" dafi, "sa_domiafi_td" datd, "sa_localidades" loc, "sa_provincias" p
-              WHERE dafi."afi_afi_id"::text = af."afi_id"::text AND dafi."domiafi_id"::text = datd."domiafi_domiafi_id"::text AND loc."loc_id"::text = dafi."loc_loc_id"::text AND datd."td_codigo" = 'POST' 
-              AND p."codigo"::text = loc."pcia_codigo"::text LIMIT 1),
-             (SELECT p."nombre" FROM "v_sa_domicilios_afiliado" dafi, "sa_domiafi_td" datd, "sa_localidades" loc, "sa_provincias" p
-              WHERE dafi."afi_afi_id"::text = af."afi_id"::text AND dafi."domiafi_id"::text = datd."domiafi_domiafi_id"::text AND loc."loc_id"::text = dafi."loc_loc_id"::text AND datd."td_codigo" = 'POST' 
-              AND p."codigo"::text = loc."pcia_codigo"::text LIMIT 1)
-        ) AS "PROVINCIA",   
-        COALESCE (
-             (SELECT pa."nombre" FROM "v_sa_domicilios_afiliado" dafi, "sa_domiafi_td" datd, "sa_localidades" loc, "sa_provincias" pr, "sa_paises" pa
-              WHERE dafi."afi_afi_id"::text = af."afi_id"::text AND dafi."domiafi_id"::text = datd."domiafi_domiafi_id"::text AND loc."loc_id"::text = dafi."loc_loc_id"::text AND datd."td_codigo" = 'POST'
-              AND pr."codigo" = loc."pcia_codigo" AND pr."pais_codigo"::text = pa."codigo"::text LIMIT 1),
-             (SELECT pa."nombre" FROM "v_sa_domicilios_afiliado" dafi, "sa_domiafi_td" datd, "sa_localidades" loc, "sa_provincias" pr, "sa_paises" pa
-              WHERE dafi."afi_afi_id"::text = af."afi_id"::text AND dafi."domiafi_id"::text = datd."domiafi_domiafi_id"::text AND loc."loc_id"::text = dafi."loc_loc_id"::text AND datd."td_codigo" = 'POST' 
-              AND pr."codigo"::text = loc."pcia_codigo"::text AND pr."pais_codigo"::text = pa."codigo"::text LIMIT 1)
-        ) AS "PAIS",                       
-        COALESCE(
-             (SELECT dafi."latitud" FROM "v_sa_domicilios_afiliado" dafi, "sa_domiafi_td" datd
-              WHERE dafi."afi_afi_id"::text = af."afi_id"::text AND dafi."domiafi_id"::text = datd."domiafi_domiafi_id"::text AND datd."td_codigo" = 'POST' LIMIT 1),
-             (SELECT dafi."latitud" FROM "v_sa_domicilios_afiliado" dafi, "sa_domiafi_td" datd
-              WHERE dafi."afi_afi_id"::text = af."afi_id"::text AND dafi."domiafi_id"::text = datd."domiafi_domiafi_id"::text AND datd."td_codigo" = 'POST' LIMIT 1)
-        ) AS "LATITUD",
-        COALESCE(
-             (SELECT dafi."longitud" FROM "v_sa_domicilios_afiliado" dafi, "sa_domiafi_td" datd
-              WHERE dafi."afi_afi_id"::text = af."afi_id"::text AND dafi."domiafi_id"::text = datd."domiafi_domiafi_id"::text AND datd."td_codigo" = 'POST' LIMIT 1),
-             (SELECT dafi."longitud" FROM "v_sa_domicilios_afiliado" dafi, "sa_domiafi_td" datd
-              WHERE dafi."afi_afi_id"::text = af."afi_id"::text AND dafi."domiafi_id"::text = datd."domiafi_domiafi_id"::text AND datd."td_codigo" = 'POST' LIMIT 1)
-        ) AS "LONGITUD"     
-    FROM "sa_afiliados" af
-    WHERE af."estado" = 'A'
-    ORDER BY af."apellidos", af."nombres"
-    """
-    # Poner la query de consultorios cuando la tenga. Si aprieto ctrl + / en un bloque de texto se comenta o se le saca el comentario a todas las líneas.
-    # Cambios a realizar:
-    # Dejar el nombre de las tablas en minúscula y sin comillas.
-    # Conseguir tabla sa_prestadores
-    # Sacar la palabra libreria. La tabla que uso no esta en ese esquema.
-    # query_consultorios = """
-    # SELECT 
-    #     c."PRES_EFE_CODIGO", c."SECUENCIA", c."NOMBRE",
-    #     d."calle", d."numero", l."localidad" AS "LOCALIDAD", pr."NOMBRE" AS "PROVINCIA", pa."NOMBRE" AS "PAIS",
-    #     d."LATITUD", d."longitud" AS "LONGITUD",
-    #     COALESCE(esp."ESPECIALIDAD", 'Sin Dato') AS "ESPECIALIDAD",
-    #     lv."NOMBRE" AS "DESC_TIPO_EFECTOR",
-    #     p."estado" AS "ESTADOPREST"
-    # FROM "SA_CONSULTORIOS" c
-    # JOIN "SA_DOMICILIOS_CONSULTORIO" d ON d."CONS_PRES_EFE_CODIGO" = c."PRES_EFE_CODIGO" AND d."CONS_SECUENCIA" = c."SECUENCIA"
-    # JOIN "SA_LOCALIDADES" l ON d."loc_loc_id" = l."loc_id"
-    # JOIN "SA_PROVINCIAS" pr ON l."PCIA_CODIGO" = pr."CODIGO"
-    # JOIN "SA_PAISES" pa ON pr."PAIS_CODIGO" = pa."CODIGO"
-    # JOIN "SA_PRESTADORES" p ON c."PRES_EFE_CODIGO" = p."EFE_CODIGO"
-    # JOIN "SA_EFECTORES" e ON e."codigo" = p."efe_codigo"
-    # LEFT JOIN "LIBRERIA"."LIB_VALORES_DOMINIO_APP" lv ON e."VDA_DRV_TIPO_EFECTOR" = lv."DRV"
-    # LEFT JOIN (
-    #     SELECT ep."NOMBRE" AS "ESPECIALIDAD", epf."EFE_CODIGO"
-    #     FROM "SA_ESPECIALIDADES" ep
-    #     JOIN "SA_ESP_PROF" epf ON ep."CODIGO" = epf."ESP_CODIGO"
-    # ) esp ON c."PRES_EFE_CODIGO" = esp."EFE_CODIGO"
-    # WHERE c."ESTADO" = 'A' AND p."estado" = 'A' AND e."estado" = 'A'
-    # """
+    # --- Función interna para rescatar nombres que Excel convirtió en fecha ---
+    def rescatar_nombre_localidad(valor):
+        if pd.isna(valor): return "SIN DATO"
+        # Si Pandas lo leyó como fecha (Timestamp o datetime)
+        if isinstance(valor, (pd.Timestamp, np.datetime64)) or hasattr(valor, 'month'):
+            try:
+                meses = ["", "ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", 
+                         "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"]
+                # Retornamos formato "25 DE MAYO"
+                return f"{valor.day} DE {meses[valor.month]}"
+            except:
+                return str(valor).upper()
+        return str(valor).upper().strip()
 
-    try:
-        conn = conectar_db()
-        df_afi_raw = pd.read_sql(query_afiliados, conn)
-       # df_cons_raw = pd.read_sql(query_consultorios, conn) #Dejar esto cuando ande la query
-
-    # Borrar lo que sigue cuando no me conecte más al excel:
-        # --- Función interna para rescatar nombres que Excel convirtió en fecha ---
-        def rescatar_nombre_localidad(valor):
-            if pd.isna(valor): return "SIN DATO"
-            # Si Pandas lo leyó como fecha (Timestamp o datetime)
-            if isinstance(valor, (pd.Timestamp, np.datetime64)) or hasattr(valor, 'month'):
-                try:
-                    meses = ["", "ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", 
-                             "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"]
-                    # Retornamos formato "25 DE MAYO"
-                    return f"{valor.day} DE {meses[valor.month]}"
-                except:
-                    return str(valor).upper()
-            return str(valor).upper().strip()
-        
-        df_cons_raw = pd.read_excel('consultorios geolocalizacion 1.xlsx')
+    # 1. CARGA Y NORMALIZACIÓN DE ARCHIVOS DE AFILIADOS
+    archivos_excel = [
+        'afiliados geolocalizacion parte 1.xlsx',
+        'afiliados geolocalizacion parte 2.xlsx',
+        'afiliados geolocalizacion parte 3.xlsx'
+    ]
+    
+    lista_df_afi = []
+    for archivo in archivos_excel:
+        try:
+            temp_df = pd.read_excel(archivo)
+            temp_df.columns = temp_df.columns.str.upper()
+            
+            # Aplicamos el rescate de nombres
+            if 'LOCALIDAD' in temp_df.columns:
+                temp_df['LOCALIDAD'] = temp_df['LOCALIDAD'].apply(rescatar_nombre_localidad)
+            if 'PROVINCIA' in temp_df.columns:
+                temp_df['PROVINCIA'] = temp_df['PROVINCIA'].astype(str).str.upper().fillna("SIN DATO")
                 
+            lista_df_afi.append(temp_df)
+        except Exception as e:
+            st.error(f"Error al leer o procesar {archivo}: {e}")
+    
+    if lista_df_afi:
+        df_afi_raw = pd.concat(lista_df_afi, ignore_index=True)
+    else:
+        return None
+        
+    # 2. CARGA DE CONSULTORIOS
+    try:
+        df_cons_raw = pd.read_excel('consultorios geolocalizacion 1.xlsx')
+        df_cons_raw.columns = df_cons_raw.columns.str.upper()
+        
         # Aplicamos el rescate de nombres también aquí
         df_cons_raw['LOCALIDAD'] = df_cons_raw['LOCALIDAD'].apply(rescatar_nombre_localidad)
         df_cons_raw['PROVINCIA'] = df_cons_raw['PROVINCIA'].astype(str).str.upper().fillna("SIN DATO")
         
-
-    # Lo de arriba borrarlo desde df_cons_raw hasta acá.
-
-    
-        # conn.close() # Cerramos si no es cache_resource
+        # FILTRO POR PAÍS
+        if 'PAIS' in df_cons_raw.columns:
+            df_cons_raw = df_cons_raw[df_cons_raw['PAIS'].astype(str).str.upper() == 'ARGENTINA']
     except Exception as e:
-        st.error(f"Error de base de datos: {e}")
+        st.error(f"Error en consultorios: {e}")
         return None
 
-    # Normalización de Columnas (Crucial para que el resto del código funcione)
-    df_afi_raw.columns = df_afi_raw.columns.str.upper()
-    df_cons_raw.columns = df_cons_raw.columns.str.upper()
-
-    # Limpieza de textos (evita problemas de espacios en blanco en Postgres)
-    for df in [df_afi_raw, df_cons_raw]:
-        for col in ['LOCALIDAD', 'PROVINCIA', 'PAIS']:
-            if col in df.columns:
-                df[col] = df[col].astype(str).str.upper().str.strip()
-
-    # Filtro País
-    df_cons_raw = df_cons_raw[df_cons_raw['PAIS'] == 'ARGENTINA']
-
-    cons_base = df_cons_raw.copy()
+    cons_base = df_cons_raw.copy() # Base completa original
     
-    # Deduplicación y Limpieza Geo
+    # A. Deduplicación y limpieza
     df_afi_clean = df_afi_raw.drop_duplicates(subset=['AFI_ID', 'CALLE', 'NUMERO'])
     
     LAT_MIN, LAT_MAX = -56.0, -21.0
@@ -190,7 +108,7 @@ def cargar_y_procesar_datos():
         return df[mask].copy()
 
     df_mapa_afi = filtrar_geo(df_afi_clean)
-    df_mapa_cons = filtrar_geo(df_cons_raw)
+    df_mapa_cons = filtrar_geo(cons_base)
 
     # SEPARACIÓN LÓGICA (Dentro de cargar_y_procesar_datos)
     # Filtramos solo lo que NO es farmacia para cálculos médicos
@@ -602,19 +520,3 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
