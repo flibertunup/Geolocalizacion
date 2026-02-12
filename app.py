@@ -144,6 +144,8 @@ def cargar_y_procesar_datos():
 
     # Filtro País
     df_cons_raw = df_cons_raw[df_cons_raw['PAIS'] == 'ARGENTINA']
+
+    cons_base = df_cons_raw.copy()
     
     # Deduplicación y Limpieza Geo
     df_afi_clean = df_afi_raw.drop_duplicates(subset=['AFI_ID', 'CALLE', 'NUMERO'])
@@ -570,6 +572,7 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
 
 
