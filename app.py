@@ -133,7 +133,20 @@ def cargar_y_procesar_datos():
        # df_cons_raw = pd.read_sql(query_consultorios, conn) #Dejar esto cuando ande la query
 
     # Borrar lo que sigue cuando no me conecte más al excel:
-
+        # --- Función interna para rescatar nombres que Excel convirtió en fecha ---
+        def rescatar_nombre_localidad(valor):
+            if pd.isna(valor): return "SIN DATO"
+            # Si Pandas lo leyó como fecha (Timestamp o datetime)
+            if isinstance(valor, (pd.Timestamp, np.datetime64)) or hasattr(valor, 'month'):
+                try:
+                    meses = ["", "ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", 
+                             "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"]
+                    # Retornamos formato "25 DE MAYO"
+                    return f"{valor.day} DE {meses[valor.month]}"
+                except:
+                    return str(valor).upper()
+            return str(valor).upper().strip()
+        
         df_cons_raw = pd.read_excel('consultorios geolocalizacion 1.xlsx')
                 
         # Aplicamos el rescate de nombres también aquí
@@ -589,6 +602,7 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
 
 
