@@ -72,15 +72,15 @@ def cargar_y_procesar_datos():
               AND p."codigo"::text = loc."pcia_codigo"::text LIMIT 1),
              (SELECT p."nombre" FROM "sa_domicilios_afiliado" dafi, "sa_domiafi_td" datd, "sa_localidades" loc, "sa_provincias" p
               WHERE dafi."afi_afi_id" = af."afi_id" AND dafi."domiafi_id" = datd."domiafi_domiafi_id" AND loc."loc_id" = dafi."loc_loc_id" AND datd."td_codigo" = 'POST' 
-              AND p."codigo" = loc."pcia_codigo" LIMIT 1)
+              AND p."codigo"::text = loc."pcia_codigo"::text LIMIT 1)
         ) AS "PROVINCIA",   
         COALESCE (
              (SELECT pa."nombre" FROM "sa_domicilios_afiliado" dafi, "sa_domiafi_td" datd, "sa_localidades" loc, "sa_provincias" pr, "sa_paises" pa
               WHERE dafi."afi_afi_id" = af."afi_id" AND dafi."domiafi_id" = datd."domiafi_domiafi_id" AND loc."loc_id" = dafi."loc_loc_id" AND datd."td_codigo" = 'POST'
-              AND pr."codigo" = loc."pcia_codigo" AND pr."pais_codigo" = pa."codigo" LIMIT 1),
+              AND pr."codigo" = loc."pcia_codigo" AND pr."pais_codigo"::text = pa."codigo"::text LIMIT 1),
              (SELECT pa."nombre" FROM "sa_domicilios_afiliado" dafi, "sa_domiafi_td" datd, "sa_localidades" loc, "sa_provincias" pr, "sa_paises" pa
               WHERE dafi."afi_afi_id" = af."afi_id" AND dafi."domiafi_id" = datd."domiafi_domiafi_id" AND loc."loc_id" = dafi."loc_loc_id" AND datd."td_codigo" = 'POST' 
-              AND pr."codigo"::text = loc."pcia_codigo"::text AND pr."pais_codigo" = pa."codigo" LIMIT 1)
+              AND pr."codigo"::text = loc."pcia_codigo"::text AND pr."pais_codigo"::text = pa."codigo"::text LIMIT 1)
         ) AS "PAIS",                       
         COALESCE(
              (SELECT dafi."latitud" FROM "sa_domicilios_afiliado" dafi, "sa_domiafi_td" datd
@@ -570,6 +570,7 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
 
 
