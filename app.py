@@ -98,35 +98,52 @@ def cargar_y_procesar_datos():
     WHERE af."estado" = 'A'
     ORDER BY af."apellidos", af."nombres"
     """
-
-    query_consultorios = """
-    SELECT 
-        c."PRES_EFE_CODIGO", c."SECUENCIA", c."NOMBRE",
-        d."calle", d."numero", l."localidad" AS "LOCALIDAD", pr."NOMBRE" AS "PROVINCIA", pa."NOMBRE" AS "PAIS",
-        d."LATITUD", d."longitud" AS "LONGITUD",
-        COALESCE(esp."ESPECIALIDAD", 'Sin Dato') AS "ESPECIALIDAD",
-        lv."NOMBRE" AS "DESC_TIPO_EFECTOR",
-        p."estado" AS "ESTADOPREST"
-    FROM "SA_CONSULTORIOS" c
-    JOIN "SA_DOMICILIOS_CONSULTORIO" d ON d."CONS_PRES_EFE_CODIGO" = c."PRES_EFE_CODIGO" AND d."CONS_SECUENCIA" = c."SECUENCIA"
-    JOIN "SA_LOCALIDADES" l ON d."loc_loc_id" = l."loc_id"
-    JOIN "SA_PROVINCIAS" pr ON l."PCIA_CODIGO" = pr."CODIGO"
-    JOIN "SA_PAISES" pa ON pr."PAIS_CODIGO" = pa."CODIGO"
-    JOIN "SA_PRESTADORES" p ON c."PRES_EFE_CODIGO" = p."EFE_CODIGO"
-    JOIN "SA_EFECTORES" e ON e."codigo" = p."efe_codigo"
-    LEFT JOIN "LIBRERIA"."LIB_VALORES_DOMINIO_APP" lv ON e."VDA_DRV_TIPO_EFECTOR" = lv."DRV"
-    LEFT JOIN (
-        SELECT ep."NOMBRE" AS "ESPECIALIDAD", epf."EFE_CODIGO"
-        FROM "SA_ESPECIALIDADES" ep
-        JOIN "SA_ESP_PROF" epf ON ep."CODIGO" = epf."ESP_CODIGO"
-    ) esp ON c."PRES_EFE_CODIGO" = esp."EFE_CODIGO"
-    WHERE c."ESTADO" = 'A' AND p."estado" = 'A' AND e."estado" = 'A'
-    """
+    # Poner la query de consultorios cuando la tenga. Si aprieto ctrl + / en un bloque de texto se comenta o se le saca el comentario a todas las líneas.
+    # Cambios a realizar:
+    # Dejar el nombre de las tablas en minúscula y sin comillas.
+    # Conseguir tabla sa_prestadores
+    # Sacar la palabra libreria. La tabla que uso no esta en ese esquema.
+    # query_consultorios = """
+    # SELECT 
+    #     c."PRES_EFE_CODIGO", c."SECUENCIA", c."NOMBRE",
+    #     d."calle", d."numero", l."localidad" AS "LOCALIDAD", pr."NOMBRE" AS "PROVINCIA", pa."NOMBRE" AS "PAIS",
+    #     d."LATITUD", d."longitud" AS "LONGITUD",
+    #     COALESCE(esp."ESPECIALIDAD", 'Sin Dato') AS "ESPECIALIDAD",
+    #     lv."NOMBRE" AS "DESC_TIPO_EFECTOR",
+    #     p."estado" AS "ESTADOPREST"
+    # FROM "SA_CONSULTORIOS" c
+    # JOIN "SA_DOMICILIOS_CONSULTORIO" d ON d."CONS_PRES_EFE_CODIGO" = c."PRES_EFE_CODIGO" AND d."CONS_SECUENCIA" = c."SECUENCIA"
+    # JOIN "SA_LOCALIDADES" l ON d."loc_loc_id" = l."loc_id"
+    # JOIN "SA_PROVINCIAS" pr ON l."PCIA_CODIGO" = pr."CODIGO"
+    # JOIN "SA_PAISES" pa ON pr."PAIS_CODIGO" = pa."CODIGO"
+    # JOIN "SA_PRESTADORES" p ON c."PRES_EFE_CODIGO" = p."EFE_CODIGO"
+    # JOIN "SA_EFECTORES" e ON e."codigo" = p."efe_codigo"
+    # LEFT JOIN "LIBRERIA"."LIB_VALORES_DOMINIO_APP" lv ON e."VDA_DRV_TIPO_EFECTOR" = lv."DRV"
+    # LEFT JOIN (
+    #     SELECT ep."NOMBRE" AS "ESPECIALIDAD", epf."EFE_CODIGO"
+    #     FROM "SA_ESPECIALIDADES" ep
+    #     JOIN "SA_ESP_PROF" epf ON ep."CODIGO" = epf."ESP_CODIGO"
+    # ) esp ON c."PRES_EFE_CODIGO" = esp."EFE_CODIGO"
+    # WHERE c."ESTADO" = 'A' AND p."estado" = 'A' AND e."estado" = 'A'
+    # """
 
     try:
         conn = conectar_db()
         df_afi_raw = pd.read_sql(query_afiliados, conn)
-        df_cons_raw = pd.read_sql(query_consultorios, conn)
+       # df_cons_raw = pd.read_sql(query_consultorios, conn) #Dejar esto cuando ande la query
+
+    # Borrar lo que sigue cuando no me conecte más al excel:
+
+        df_cons_raw = pd.read_excel('consultorios geolocalizacion 1.xlsx')
+                
+        # Aplicamos el rescate de nombres también aquí
+        df_cons_raw['LOCALIDAD'] = df_cons_raw['LOCALIDAD'].apply(rescatar_nombre_localidad)
+        df_cons_raw['PROVINCIA'] = df_cons_raw['PROVINCIA'].astype(str).str.upper().fillna("SIN DATO")
+        
+
+    # Lo de arriba borrarlo desde df_cons_raw hasta acá.
+
+    
         # conn.close() # Cerramos si no es cache_resource
     except Exception as e:
         st.error(f"Error de base de datos: {e}")
@@ -572,6 +589,7 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
 
 
