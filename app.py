@@ -248,7 +248,14 @@ try:
     else:
         max_dist_data = int(math.ceil(max_val)) # Ejemplo: 268.14 -> 269
 
-    dist_range = st.sidebar.slider("Rango de Distancia Promedio (Km)", 0.0, max_dist_data, (0.0, max_dist_data), key='distancia')
+    dist_range = st.sidebar.slider(
+        "Rango de Distancia Promedio (Km)",
+        0,                  # Mínimo entero
+        max_dist_data,      # Máximo entero redondeado
+        (0, max_dist_data), # Selección inicial
+        step=1,             # Saltos de 1 en 1 km
+        key='distancia'     # MANTENER ESTO para que funcione el botón reset
+    )
 
     
     # --- APLICAR FILTROS EN CADENA ---
@@ -525,4 +532,5 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
