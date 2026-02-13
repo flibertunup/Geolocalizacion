@@ -230,7 +230,7 @@ try:
         list_loc = ["Todas"] + sorted(afi_geo_all[afi_geo_all['PROVINCIA'] == prov_sel]['LOCALIDAD'].unique().tolist())
         loc_sel = st.sidebar.selectbox("Seleccionar Localidad", list_loc, key='localidad')
     else:
-        st.sidebar.info("Seleccione una provincia para filtrar por localidad.")
+        st.sidebar.warning("Seleccione una provincia para filtrar por localidad.")
 
 
     # Filtro de Especialidad
@@ -350,7 +350,7 @@ try:
     total_base_medicos = len(cons_base_f[cons_base_f['DESC_TIPO_EFECTOR'] != 'FARMACIA'])
     st.sidebar.write(f"Total Base Filtrada: {formato_miles(total_base_medicos)}")
     st.sidebar.write(f"En Mapa: {formato_miles(len(cons_médicos))}")
-    st.sidebar.success(f"Éxito Geo: {formato_porcentaje(len(cons_médicos), total_base_medicos)}")
+    st.sidebar.info(f"Éxito Geo: {formato_porcentaje(len(cons_médicos), total_base_medicos)}")
 
     
 
@@ -372,7 +372,7 @@ try:
     total_base_farmacias = len(cons_base_f[cons_base_f['DESC_TIPO_EFECTOR'] == 'FARMACIA'])
     st.sidebar.write(f"Total Base Filtrada: {formato_miles(total_base_farmacias)}")
     st.sidebar.write(f"En Mapa: {formato_miles(len(farmacias_f))}")
-    st.sidebar.success(f"Éxito Geo: {formato_porcentaje(len(farmacias_f), total_base_farmacias)}")
+    st.sidebar.info(f"Éxito Geo: {formato_porcentaje(len(farmacias_f), total_base_farmacias)}")
 
 
     
@@ -520,3 +520,4 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
