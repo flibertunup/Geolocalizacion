@@ -79,7 +79,7 @@ def cargar_y_procesar_datos():
         
     # 2. CARGA DE CONSULTORIOS
     try:
-        df_cons_raw = pd.read_excel('consultorios geolocalizacion 1.xlsx')
+        df_cons_raw = pd.read_excel('consultorios geolocalizacion 13-02.xlsx')
         df_cons_raw.columns = df_cons_raw.columns.str.upper()
         
         # Aplicamos el rescate de nombres también aquí
@@ -520,4 +520,5 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
