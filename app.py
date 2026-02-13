@@ -7,6 +7,7 @@ from folium.plugins import HeatMap
 from scipy.spatial import cKDTree
 import io
 import pyodbc
+import math
 
 # Función con caché para no conectar a la DB en cada click:
 @st.cache_resource
@@ -239,9 +240,13 @@ try:
 
     tipo_mapa = st.sidebar.radio("Tipo de Vista", ["Marcadores (Localidades)", "Heatmap (Distribución de Afiliados)"])
 
-    # Usamos el máximo de la distancia media por localidad para que el slider sea coherente
-    max_dist_data = float(afi_geo_all.groupby(['LOCALIDAD', 'PROVINCIA'])['distancia_km'].mean().dropna().max()) 
-    if np.isnan(max_dist_data): max_dist_data = 100.0 # Valor por defecto por seguridad
+    # --- Usamos el máximo de la distancia media por localidad para que el slider sea coherente y redondeamos al entero superior ---
+    max_val = afi_geo_all.groupby(['LOCALIDAD', 'PROVINCIA'])['distancia_km'].mean().dropna().max()
+
+    if pd.isna(max_val): 
+        max_dist_data = 100 
+    else:
+        max_dist_data = int(math.ceil(max_val)) # Ejemplo: 268.14 -> 269
 
     dist_range = st.sidebar.slider("Rango de Distancia Promedio (Km)", 0.0, max_dist_data, (0.0, max_dist_data), key='distancia')
 
@@ -520,3 +525,4 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
