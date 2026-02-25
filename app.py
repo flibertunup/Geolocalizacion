@@ -169,7 +169,7 @@ def cargar_y_procesar_datos():
          ) AS "Longitud"     
     FROM sa_afiliados af
     WHERE af.estado = 'A'
-    ORDER BY af.apellidos, af.nombres;
+    ORDER BY af.apellidos, af.nombres
     """
     query_consultorios = """
     SELECT c.PRES_EFE_CODIGO
@@ -700,6 +700,7 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
 
 
