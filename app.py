@@ -7,17 +7,12 @@ from folium.plugins import HeatMap
 from scipy.spatial import cKDTree
 import io
 import pyodbc
+import oracledb
 import math
 
 # Función con caché para no conectar a la DB en cada click:
 @st.cache_resource
 def conectar_db():
-    tns_path = r"C:\Oracle\Product\10.1.0\Client_3\Network\Admin"
-    try:
-        oracledb.init_oracle_client(config_dir=tns_path)
-    except Exception:
-        pass
- 
     return oracledb.connect(
         user="flibertun",
         password="FLIBERTUN",
@@ -699,6 +694,7 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
 
 
