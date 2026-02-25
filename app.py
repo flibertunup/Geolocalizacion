@@ -289,9 +289,9 @@ def cargar_y_procesar_datos():
         
         return df_afi_clean, df_cons_raw, df_mapa_afi, df_mapa_cons
 
-except Exception as e:
-        st.error(f"Error en la base de datos: {e}")
-        return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
+    except Exception as e:
+            st.error(f"Error en la base de datos: {e}")
+            return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
 
 # --- 3. INTERFAZ Y FILTROS ---
 
@@ -699,6 +699,7 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
 
 
