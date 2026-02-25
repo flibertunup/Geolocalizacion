@@ -300,9 +300,7 @@ def reiniciar_filtros():
         # Esto resetea el slider si le pones key='distancia'
         del st.session_state['distancia']
 
-
 st.title("📍 Tablero de Gestión de Cobertura Sanitaria", anchor=False)
-
 
 # --- SECCIÓN DE AYUDA / MANUAL ---
 with st.expander("❓ ¿Cómo usar este tablero y qué significan las métricas?"):
@@ -698,6 +696,7 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
 
 
