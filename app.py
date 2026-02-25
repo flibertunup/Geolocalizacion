@@ -477,13 +477,21 @@ try:
 
     # Unimos para tener la vista final
     data_filtrada = pd.merge(res_afi, res_cons, on=['LOCALIDAD', 'PROVINCIA'], how='outer')
-    data_filtrada = pd.merge(data_filtrada, res_far, on=['LOCALIDAD', 'PROVINCIA'], how='outer').fillna(0)
+    data_filtrada = pd.merge(data_filtrada, res_far, on=['LOCALIDAD', 'PROVINCIA'], how='outer')
 
-    # Consolidación de coordenadas y métricas finales
-    data_filtrada['lat_ref'] = np.where(data_filtrada['lat_ref'] == 0, data_filtrada['lat_cons'], data_filtrada['lat_ref'])
-    data_filtrada['lon_ref'] = np.where(data_filtrada['lon_ref'] == 0, data_filtrada['lon_cons'], data_filtrada['lon_ref'])
-    data_filtrada.loc[data_filtrada['cant_afiliados'] == 0, 'dist_media'] = np.nan
+    # 2. Consolidamos coordenadas (Prioridad Afiliados, luego Consultorios)
+    data_filtrada['lat_ref'] = data_filtrada['lat_ref'].combine_first(data_filtrada['lat_cons'])
+    data_filtrada['lon_ref'] = data_filtrada['lon_ref'].combine_first(data_filtrada['lon_cons'])
+
+    # 3. Calculamos métricas (antes de rellenar con 0 para no arruinar promedios)
     data_filtrada['cons_por_afi'] = data_filtrada['cant_consultorios'] / data_filtrada['cant_afiliados'].replace(0, np.nan)
+    
+    # 4. AHORA SÍ: Rellenamos con 0 solo lo que es conteo
+    cols_conteo = ['cant_afiliados', 'cant_farmacias', 'cant_consultorios']
+    data_filtrada[cols_conteo] = data_filtrada[cols_conteo].fillna(0)
+    
+    # 5. Limpieza para el mapa: quitamos lo que no tenga ubicación
+    data_filtrada = data_filtrada.dropna(subset=['lat_ref', 'lon_ref'])
 
     # 6. FILTRO DE DISTANCIA (Sobre el resumen final)
     mask_distancia = (data_filtrada['dist_media'].between(dist_range[0], dist_range[1])) | (data_filtrada['dist_media'].isna())
@@ -688,6 +696,7 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
 
 
