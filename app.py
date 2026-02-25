@@ -118,13 +118,6 @@ def cargar_y_procesar_datos():
                  (SELECT loc.localidad FROM sa_domicilios_afiliado dafi, sa_domiafi_td datd, sa_localidades loc
                   WHERE dafi.afi_afi_id = af.afi_afi_id AND dafi.domiafi_id = datd.domiafi_domiafi_id AND loc.loc_id = dafi.loc_loc_id AND datd.td_codigo = 'POST' AND ROWNUM < 2))
                      AS LOCALIDAD,
-        -- 6. PROVINCIA
-             NVL (
-                 (SELECT loc.pcia_codigo FROM sa_domicilios_afiliado dafi, sa_domiafi_td datd, sa_localidades loc
-                  WHERE dafi.afi_afi_id = af.afi_id AND dafi.domiafi_id = datd.domiafi_domiafi_id AND loc.loc_id = dafi.loc_loc_id AND datd.td_codigo = 'POST' AND ROWNUM < 2),
-                 (SELECT loc.pcia_codigo FROM sa_domicilios_afiliado dafi, sa_domiafi_td datd, sa_localidades loc
-                  WHERE dafi.afi_afi_id = af.afi_afi_id AND dafi.domiafi_id = datd.domiafi_domiafi_id AND loc.loc_id = dafi.loc_loc_id AND datd.td_codigo = 'POST' AND ROWNUM < 2))
-                                AS PROVINCIA,
              -- 7. Nombre provincia
              NVL (
                  (SELECT p.NOMBRE FROM sa_domicilios_afiliado dafi, sa_domiafi_td datd, sa_localidades loc,sa_provincias p
@@ -133,17 +126,8 @@ def cargar_y_procesar_datos():
                  (SELECT p.NOMBRE FROM sa_domicilios_afiliado dafi, sa_domiafi_td datd, sa_localidades loc,sa_provincias p
                   WHERE dafi.afi_afi_id = af.afi_afi_id AND dafi.domiafi_id = datd.domiafi_domiafi_id AND loc.loc_id = dafi.loc_loc_id AND datd.td_codigo = 'POST' 
                   and p.codigo=loc.PCIA_CODIGO  AND ROWNUM < 2))
-                                AS Nombre_PROVINCIA,   
-             -- 8. codigo PAIS
-             NVL (
-                 (SELECT pr.PAIS_CODIGO FROM sa_domicilios_afiliado dafi, sa_domiafi_td datd, sa_localidades loc,sa_provincias pr 
-                  WHERE dafi.afi_afi_id = af.afi_id AND dafi.domiafi_id = datd.domiafi_domiafi_id AND loc.loc_id = dafi.loc_loc_id AND datd.td_codigo = 'POST' 
-                  and pr.codigo=loc.PCIA_CODIGO  AND ROWNUM < 2),
-                 (SELECT pr.PAIS_CODIGO FROM sa_domicilios_afiliado dafi, sa_domiafi_td datd, sa_localidades loc,sa_provincias pr
-                  WHERE dafi.afi_afi_id = af.afi_afi_id AND dafi.domiafi_id = datd.domiafi_domiafi_id AND loc.loc_id = dafi.loc_loc_id AND datd.td_codigo = 'POST' 
-                  and pr.codigo=loc.PCIA_CODIGO  AND ROWNUM < 2))
-                                AS PAIS,                                                           
-             -- 9. Nombre PAIS
+                                AS PROVINCIA,                                                             
+             -- 9. PAIS
              NVL (
                  (SELECT pa.NOMBRE FROM sa_domicilios_afiliado dafi, sa_domiafi_td datd, sa_localidades loc,sa_provincias pr,sa_paises pa
                   WHERE dafi.afi_afi_id = af.afi_id AND dafi.domiafi_id = datd.domiafi_domiafi_id AND loc.loc_id = dafi.loc_loc_id AND datd.td_codigo = 'POST'
@@ -154,7 +138,7 @@ def cargar_y_procesar_datos():
                    and pr.codigo=loc.PCIA_CODIGO 
                   and pr.PAIS_CODIGO=pa.CODIGO 
                   AND ROWNUM < 2))
-                                AS NOMBRE_PAIS,                       
+                                AS PAIS,                       
        NVL(
              (SELECT dafi.latitud FROM sa_domicilios_afiliado dafi, sa_domiafi_td datd
               WHERE dafi.afi_afi_id = af.afi_id AND dafi.domiafi_id = datd.domiafi_domiafi_id AND datd.td_codigo = 'POST' AND ROWNUM < 2),
@@ -702,6 +686,7 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
 
 
