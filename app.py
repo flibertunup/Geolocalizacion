@@ -22,7 +22,7 @@ def conectar_db():
     return oracledb.connect(
         user="flibertun",
         password="FLIBERTUN",
-        dsn="PROD_SMARTIN11"
+        dsn=dsn_tns
     )
     
 # --- SEGURIDAD ---
@@ -700,6 +700,7 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
 
 
