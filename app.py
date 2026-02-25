@@ -256,9 +256,11 @@ def cargar_y_procesar_datos():
         # Normalización
         for df in [df_afi_raw, df_cons_raw]:
             df.columns = df.columns.str.upper()
-            df['LOCALIDAD'] = df['LOCALIDAD'].apply(rescatar_nombre_localidad)
-            df['PROVINCIA'] = df['PROVINCIA'].astype(str).str.upper().fillna("SIN DATO")
-
+            if 'LOCALIDAD' in df.columns:
+                df['LOCALIDAD'] = df['LOCALIDAD'].astype(str).str.strip().str.upper()
+            if 'PROVINCIA' in df.columns:
+                df['PROVINCIA'] = df['PROVINCIA'].astype(str).str.strip().str.upper().fillna("SIN DATO")
+            
         # Filtro de País en Consultorios
         if 'PAIS' in df_cons_raw.columns:
             df_cons_raw = df_cons_raw[df_cons_raw['PAIS'].astype(str).str.upper() == 'ARGENTINA']
@@ -700,6 +702,7 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
 
 
