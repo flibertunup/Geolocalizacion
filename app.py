@@ -287,8 +287,11 @@ def cargar_y_procesar_datos():
         dist, _ = tree.query(df_mapa_afi[['LATITUD', 'LONGITUD']].values, k=1)
         df_mapa_afi['distancia_km'] = dist * 111.13
         
-        return df_afi_clean, cons_base, df_mapa_afi, df_mapa_cons
+        return df_afi_clean, df_cons_raw, df_mapa_afi, df_mapa_cons
 
+except Exception as e:
+        st.error(f"Error en la base de datos: {e}")
+        return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
 
 # --- 3. INTERFAZ Y FILTROS ---
 
@@ -326,7 +329,7 @@ with st.expander("❓ ¿Cómo usar este tablero y qué significan las métricas?
 
 try:
 
-    afi_base, cons_base, afi_geo_all, cons_geo_all = cargar_y_procesar_datos()
+    afi_base, df_cons_raw, afi_geo_all, cons_geo_all = cargar_y_procesar_datos()
 
 
 
@@ -399,7 +402,7 @@ try:
 
 
     # Filtro de Especialidad
-    list_esp = ["Todas"] + sorted(cons_base['ESPECIALIDAD'].unique().tolist())
+    list_esp = ["Todas"] + sorted(df_cons_raw['ESPECIALIDAD'].unique().tolist())
     esp_sel = st.sidebar.selectbox("Seleccionar Especialidad", list_esp, key='especialidad')
 
     tipo_mapa = st.sidebar.radio("Tipo de Vista", ["Marcadores (Localidades)", "Heatmap (Distribución de Afiliados)"])
@@ -427,7 +430,7 @@ try:
     afi_filtrados = afi_geo_all.copy()       # Afiliados con mapa
     cons_filtrados_all = cons_geo_all.copy() # Prestadores + Farmacias con mapa
     afi_base_f = afi_base.copy()             # Total Afiliados (para Éxito Geo)
-    cons_base_f = cons_base.copy()           # Total Consultorios (para Éxito Geo)
+    cons_base_f = df_cons_raw.copy()           # Total Consultorios (para Éxito Geo)
 
     # Separamos antes de filtrar especialidad. Esto nos permite que las farmacias no desaparezcan si filtras una especialidad médica
     cons_médicos = cons_filtrados_all[cons_filtrados_all['DESC_TIPO_EFECTOR'] != 'FARMACIA']
@@ -696,6 +699,7 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
 
 
