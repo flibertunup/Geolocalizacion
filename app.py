@@ -13,6 +13,12 @@ import math
 # Función con caché para no conectar a la DB en cada click:
 @st.cache_resource
 def conectar_db():
+    host = "10.1.192.11" 
+    port = 1521           
+    service_name = "PROD" # Nombre del servicio o SID
+    
+    dsn_tns = f"{host}:{port}/{service_name}"
+    
     return oracledb.connect(
         user="flibertun",
         password="FLIBERTUN",
@@ -694,6 +700,7 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
 
 
