@@ -12,7 +12,17 @@ import math
 # Función con caché para no conectar a la DB en cada click:
 @st.cache_resource
 def conectar_db():
-    return pyodbc.connect('DSN=PostgresUP')
+    tns_path = r"C:\Oracle\Product\10.1.0\Client_3\Network\Admin"
+    try:
+        oracledb.init_oracle_client(config_dir=tns_path)
+    except Exception:
+        pass
+ 
+    return oracledb.connect(
+        user="flibertun",
+        password="FLIBERTUN",
+        dsn="PROD_SMARTIN11"
+    )
     
 # --- SEGURIDAD ---
 CLAVE_DESARROLLADOR = "admin123" # Cambia esto por tu clave
@@ -32,75 +42,231 @@ def formato_porcentaje(parte, total):
 def formato_miles(valor):
     return f"{int(valor):,}".replace(",", ".")
 
+def rescatar_nombre_localidad(valor):
+    if pd.isna(valor): return "SIN DATO"
+    if isinstance(valor, (pd.Timestamp, np.datetime64)) or hasattr(valor, 'month'):
+        try:
+            meses = ["", "ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", 
+                     "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"]
+            return f"{valor.day} DE {meses[valor.month]}"
+        except:
+            return str(valor).upper()
+    return str(valor).upper().strip()
+
+
 # --- 2. PROCESAMIENTO DE DATOS ---
 
 @st.cache_data
 def cargar_y_procesar_datos():
-    # --- Función interna para rescatar nombres que Excel convirtió en fecha ---
-    def rescatar_nombre_localidad(valor):
-        if pd.isna(valor): return "SIN DATO"
-        # Si Pandas lo leyó como fecha (Timestamp o datetime)
-        if isinstance(valor, (pd.Timestamp, np.datetime64)) or hasattr(valor, 'month'):
-            try:
-                meses = ["", "ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", 
-                         "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"]
-                # Retornamos formato "25 DE MAYO"
-                return f"{valor.day} DE {meses[valor.month]}"
-            except:
-                return str(valor).upper()
-        return str(valor).upper().strip()
-
-    # 1. CARGA Y NORMALIZACIÓN DE ARCHIVOS DE AFILIADOS
-    archivos_excel = [
-        'afiliados geolocalizacion parte 1.xlsx',
-        'afiliados geolocalizacion parte 2.xlsx',
-        'afiliados geolocalizacion parte 3.xlsx'
-    ]
-    
-    lista_df_afi = []
-    for archivo in archivos_excel:
-        try:
-            temp_df = pd.read_excel(archivo)
-            temp_df.columns = temp_df.columns.str.upper()
-            
-            # Aplicamos el rescate de nombres
-            if 'LOCALIDAD' in temp_df.columns:
-                temp_df['LOCALIDAD'] = temp_df['LOCALIDAD'].apply(rescatar_nombre_localidad)
-            if 'PROVINCIA' in temp_df.columns:
-                temp_df['PROVINCIA'] = temp_df['PROVINCIA'].astype(str).str.upper().fillna("SIN DATO")
-                
-            lista_df_afi.append(temp_df)
-        except Exception as e:
-            st.error(f"Error al leer o procesar {archivo}: {e}")
-    
-    if lista_df_afi:
-        df_afi_raw = pd.concat(lista_df_afi, ignore_index=True)
-    else:
-        return None
+    query_afiliados = """
+    SELECT  
+    af.codigo        AS "Codigo",
+    af.apellidos     AS "Apellidos",
+    af.nombres       AS "Nombres",
+    af.afi_id        AS "AFI_ID",
+   NVL(
+         (SELECT dafi.domiafi_id FROM sa_domicilios_afiliado dafi, sa_domiafi_td datd
+          WHERE dafi.afi_afi_id = af.afi_id AND dafi.domiafi_id = datd.domiafi_domiafi_id AND datd.td_codigo = 'POST' AND ROWNUM < 2),
+         (SELECT dafi.domiafi_id l FROM sa_domicilios_afiliado dafi, sa_domiafi_td datd
+          WHERE dafi.afi_afi_id = af.afi_afi_id AND dafi.domiafi_id = datd.domiafi_domiafi_id AND datd.td_codigo = 'POST' AND ROWNUM < 2)
+     ) AS "DOMIAFI_ID",
+  --  da.domiafi_id    AS "DOMIAFI_ID",
+     NVL(
+         (SELECT dafi.calle FROM sa_domicilios_afiliado dafi, sa_domiafi_td datd
+          WHERE dafi.afi_afi_id = af.afi_id AND dafi.domiafi_id = datd.domiafi_domiafi_id AND datd.td_codigo = 'POST' AND ROWNUM < 2),
+         (SELECT dafi.calle  FROM sa_domicilios_afiliado dafi, sa_domiafi_td datd
+          WHERE dafi.afi_afi_id = af.afi_afi_id AND dafi.domiafi_id = datd.domiafi_domiafi_id AND datd.td_codigo = 'POST' AND ROWNUM < 2)
+        )
+     as "CALLE",
+    --da.calle         AS "Calle",
+     NVL(
+         (SELECT dafi.NUMERO FROM sa_domicilios_afiliado dafi, sa_domiafi_td datd
+          WHERE dafi.afi_afi_id = af.afi_id AND dafi.domiafi_id = datd.domiafi_domiafi_id AND datd.td_codigo = 'POST' AND ROWNUM < 2),
+         (SELECT dafi.NUMERO FROM sa_domicilios_afiliado dafi, sa_domiafi_td datd
+          WHERE dafi.afi_afi_id = af.afi_afi_id AND dafi.domiafi_id = datd.domiafi_domiafi_id AND datd.td_codigo = 'POST' AND ROWNUM < 2)
+        )
+     as    "Numero",
+   -- da.numero        AS "Numero",
+     NVL(
+         (SELECT dafi.PISO FROM sa_domicilios_afiliado dafi, sa_domiafi_td datd
+          WHERE dafi.afi_afi_id = af.afi_id AND dafi.domiafi_id = datd.domiafi_domiafi_id AND datd.td_codigo = 'POST' AND ROWNUM < 2),
+         (SELECT dafi.PISO FROM sa_domicilios_afiliado dafi, sa_domiafi_td datd
+          WHERE dafi.afi_afi_id = af.afi_afi_id AND dafi.domiafi_id = datd.domiafi_domiafi_id AND datd.td_codigo = 'POST' AND ROWNUM < 2)
+        )
+     as  "Piso",
+  --  da.piso          AS "Piso",
+   -- da.dpto          AS "Departamento",
+     NVL(
+         (SELECT dafi.DPTO FROM sa_domicilios_afiliado dafi, sa_domiafi_td datd
+          WHERE dafi.afi_afi_id = af.afi_id AND dafi.domiafi_id = datd.domiafi_domiafi_id AND datd.td_codigo = 'POST' AND ROWNUM < 2),
+         (SELECT dafi.DPTO FROM sa_domicilios_afiliado dafi, sa_domiafi_td datd
+          WHERE dafi.afi_afi_id = af.afi_afi_id AND dafi.domiafi_id = datd.domiafi_domiafi_id AND datd.td_codigo = 'POST' AND ROWNUM < 2)
+        )
+     as    "Departamento",
+  -- 3. CODIGO_POSTAL
+         NVL (
+             (SELECT loc.codigo_postal FROM sa_domicilios_afiliado dafi, sa_domiafi_td datd, sa_localidades loc
+              WHERE dafi.afi_afi_id = af.afi_id AND dafi.domiafi_id = datd.domiafi_domiafi_id AND loc.loc_id = dafi.loc_loc_id AND datd.td_codigo = 'POST' AND ROWNUM < 2),
+             (SELECT loc.codigo_postal FROM sa_domicilios_afiliado dafi, sa_domiafi_td datd, sa_localidades loc
+              WHERE dafi.afi_afi_id = af.afi_afi_id AND dafi.domiafi_id = datd.domiafi_domiafi_id AND loc.loc_id = dafi.loc_loc_id AND datd.td_codigo = 'POST' AND ROWNUM < 2)
+              )     AS CODIGOPOST,
+    -- 4. LOCALIDAD
+         NVL (
+             (SELECT loc.localidad FROM sa_domicilios_afiliado dafi, sa_domiafi_td datd, sa_localidades loc
+              WHERE dafi.afi_afi_id = af.afi_id AND dafi.domiafi_id = datd.domiafi_domiafi_id AND loc.loc_id = dafi.loc_loc_id AND datd.td_codigo = 'POST' AND ROWNUM < 2),
+             (SELECT loc.localidad FROM sa_domicilios_afiliado dafi, sa_domiafi_td datd, sa_localidades loc
+              WHERE dafi.afi_afi_id = af.afi_afi_id AND dafi.domiafi_id = datd.domiafi_domiafi_id AND loc.loc_id = dafi.loc_loc_id AND datd.td_codigo = 'POST' AND ROWNUM < 2))
+                 AS LOCALIDAD,
+    -- 6. PROVINCIA
+         NVL (
+             (SELECT loc.pcia_codigo FROM sa_domicilios_afiliado dafi, sa_domiafi_td datd, sa_localidades loc
+              WHERE dafi.afi_afi_id = af.afi_id AND dafi.domiafi_id = datd.domiafi_domiafi_id AND loc.loc_id = dafi.loc_loc_id AND datd.td_codigo = 'POST' AND ROWNUM < 2),
+             (SELECT loc.pcia_codigo FROM sa_domicilios_afiliado dafi, sa_domiafi_td datd, sa_localidades loc
+              WHERE dafi.afi_afi_id = af.afi_afi_id AND dafi.domiafi_id = datd.domiafi_domiafi_id AND loc.loc_id = dafi.loc_loc_id AND datd.td_codigo = 'POST' AND ROWNUM < 2))
+                            AS PROVINCIA,
+         -- 7. Nombre provincia
+         NVL (
+             (SELECT p.NOMBRE FROM sa_domicilios_afiliado dafi, sa_domiafi_td datd, sa_localidades loc,sa_provincias p
+              WHERE dafi.afi_afi_id = af.afi_id AND dafi.domiafi_id = datd.domiafi_domiafi_id AND loc.loc_id = dafi.loc_loc_id AND datd.td_codigo = 'POST' 
+               and p.codigo=loc.PCIA_CODIGO AND ROWNUM < 2),
+             (SELECT p.NOMBRE FROM sa_domicilios_afiliado dafi, sa_domiafi_td datd, sa_localidades loc,sa_provincias p
+              WHERE dafi.afi_afi_id = af.afi_afi_id AND dafi.domiafi_id = datd.domiafi_domiafi_id AND loc.loc_id = dafi.loc_loc_id AND datd.td_codigo = 'POST' 
+              and p.codigo=loc.PCIA_CODIGO  AND ROWNUM < 2))
+                            AS Nombre_PROVINCIA,   
+         -- 8. codigo PAIS
+         NVL (
+             (SELECT pr.PAIS_CODIGO FROM sa_domicilios_afiliado dafi, sa_domiafi_td datd, sa_localidades loc,sa_provincias pr 
+              WHERE dafi.afi_afi_id = af.afi_id AND dafi.domiafi_id = datd.domiafi_domiafi_id AND loc.loc_id = dafi.loc_loc_id AND datd.td_codigo = 'POST' 
+              and pr.codigo=loc.PCIA_CODIGO  AND ROWNUM < 2),
+             (SELECT pr.PAIS_CODIGO FROM sa_domicilios_afiliado dafi, sa_domiafi_td datd, sa_localidades loc,sa_provincias pr
+              WHERE dafi.afi_afi_id = af.afi_afi_id AND dafi.domiafi_id = datd.domiafi_domiafi_id AND loc.loc_id = dafi.loc_loc_id AND datd.td_codigo = 'POST' 
+              and pr.codigo=loc.PCIA_CODIGO  AND ROWNUM < 2))
+                            AS PAIS,                                                           
+         -- 9. Nombre PAIS
+         NVL (
+             (SELECT pa.NOMBRE FROM sa_domicilios_afiliado dafi, sa_domiafi_td datd, sa_localidades loc,sa_provincias pr,sa_paises pa
+              WHERE dafi.afi_afi_id = af.afi_id AND dafi.domiafi_id = datd.domiafi_domiafi_id AND loc.loc_id = dafi.loc_loc_id AND datd.td_codigo = 'POST'
+              and pr.codigo=loc.PCIA_CODIGO 
+              and pr.PAIS_CODIGO=pa.CODIGO AND ROWNUM < 2),
+             (SELECT pa.NOMBRE FROM sa_domicilios_afiliado dafi, sa_domiafi_td datd, sa_localidades loc,sa_provincias pr,sa_paises pa
+              WHERE dafi.afi_afi_id = af.afi_afi_id AND dafi.domiafi_id = datd.domiafi_domiafi_id AND loc.loc_id = dafi.loc_loc_id AND datd.td_codigo = 'POST' 
+               and pr.codigo=loc.PCIA_CODIGO 
+              and pr.PAIS_CODIGO=pa.CODIGO 
+              AND ROWNUM < 2))
+                            AS NOMBRE_PAIS,                       
+   NVL(
+         (SELECT dafi.latitud FROM sa_domicilios_afiliado dafi, sa_domiafi_td datd
+          WHERE dafi.afi_afi_id = af.afi_id AND dafi.domiafi_id = datd.domiafi_domiafi_id AND datd.td_codigo = 'POST' AND ROWNUM < 2),
+         (SELECT dafi.latitud l FROM sa_domicilios_afiliado dafi, sa_domiafi_td datd
+          WHERE dafi.afi_afi_id = af.afi_afi_id AND dafi.domiafi_id = datd.domiafi_domiafi_id AND datd.td_codigo = 'POST' AND ROWNUM < 2)
+     ) AS  "Latitud",
+   NVL(
+         (SELECT dafi.longitud FROM sa_domicilios_afiliado dafi, sa_domiafi_td datd
+          WHERE dafi.afi_afi_id = af.afi_id AND dafi.domiafi_id = datd.domiafi_domiafi_id AND datd.td_codigo = 'POST' AND ROWNUM < 2),
+         (SELECT dafi.longitud l FROM sa_domicilios_afiliado dafi, sa_domiafi_td datd
+          WHERE dafi.afi_afi_id = af.afi_afi_id AND dafi.domiafi_id = datd.domiafi_domiafi_id AND datd.td_codigo = 'POST' AND ROWNUM < 2)
+     ) AS "Longitud"     
+FROM sa_afiliados af
+WHERE af.estado = 'A'
+ORDER BY af.apellidos, af.nombres;
+"""
+    query_consultorios = """
+    SELECT c.PRES_EFE_CODIGO
+,c.SECUENCIA
+,c.USERNAME
+,c.NOMBRE
+,d.domicons_id
+,d.calle
+,d.numero
+,d.piso
+,d.dpto
+,substr(l.CODIGO_POSTAL,1,4) Codigo_Postal
+,d.BARRIO
+,l.localidad
+,pr.NOMBRE Provincia
+,pa.NOMBRE Pais
+,d.LATITUD
+,d.longitud
+,d.OBSERVACIONES
+,nvl(esp.Cod_Esp,'Sin Dato') Cod_Esp
+,nvl(esp.ESPECIALIDAD, 'Sin Dato') ESPECIALIDAD
+,p.AGPRES_CODIGO Agrupacion_Prestador
+,ap.NOMBRE Desc_Agrup_Prestador
+,e.CE_CODIGO Clase_Efector
+,cle.NOMBRE Desc_Clase_Efector
+,e.AGEFE_CODIGO Agrupacion_Efector
+,age.NOMBRE Desc_Agrupacion_Efector
+,e.VDA_DRV_TIPO_EFECTOR Tipo_Efector
+,lv.NOMBRE Desc_Tipo_Efector
+,e.CATEFE_CODIGO Categoria_Efector
+,ce.NOMBRE Desc_Categoria_Efector
+,p.estado EstadoPrest
+,c.estado EstadoCons
+,e.ESTADO EstadoEfector
+FROM sa_consultorios c
+,sa_domicilios_consultorio d
+,sa_localidades l
+,sa_provincias pr
+,sa_paises pa
+,sa_prestadores p
+,sa_efectores e
+,sa_agrupaciones_efectores age
+,sa_categorias_efector ce
+,sa_clases_efector cle
+,libreria.lib_valores_dominio_app lv 
+,SA_AGRUPACIONES_PRESTADORES ap
+,(select ep.CODIGO Cod_Esp, ep.NOMBRE Especialidad,epf.EFE_CODIGO
+from
+sa_especialidades ep
+,sa_esp_prof epf
+where
+ep.CODIGO=epf.ESP_CODIGO
+) esp
+where d.loc_loc_id = l.loc_id
+and d.CONS_PRES_EFE_CODIGO = c.PRES_EFE_CODIGO
+and d.CONS_SECUENCIA = c.SECUENCIA
+and c.PRES_EFE_CODIGO=p.EFE_CODIGO
+and l.PCIA_CODIGO=pr.CODIGO
+and pr.PAIS_CODIGO=pa.CODIGO
+and e.codigo=p.efe_codigo
+and c.PRES_EFE_CODIGO=esp.EFE_CODIGO (+)
+and e.AGEFE_CODIGO=age.CODIGO (+)
+and e.CATEFE_CODIGO=ce.CODIGO (+)
+and e.CE_CODIGO=cle.CODIGO (+)
+and e.VDA_DRV_TIPO_EFECTOR=lv.DRV(+)
+and p.AGPRES_CODIGO=ap.CODIGO (+)
+and c.ESTADO='A'
+and p.estado='A'
+and e.estado='A'
+--and c.USERNAME is not null
+--and c.PRES_EFE_CODIGO='888888'
+--and c.SECUENCIA=1
+--and c.PRES_EFE_CODIGO in ('888888','10010') --10010 no tiene especialidad
+order by 1,2
+"""
         
     # 2. CARGA DE CONSULTORIOS
     try:
-        df_cons_raw = pd.read_excel('consultorios geolocalizacion 13-02.xlsx')
-        df_cons_raw.columns = df_cons_raw.columns.str.upper()
+        conn = conectar_db()
+        df_afi_raw = pd.read_sql(query_afiliados, conn)
+        df_cons_raw = pd.read_sql(query_consultorios, conn)
+        conn.close()
         
-        # Aplicamos el rescate de nombres también aquí
-        df_cons_raw['LOCALIDAD'] = df_cons_raw['LOCALIDAD'].apply(rescatar_nombre_localidad)
-        df_cons_raw['PROVINCIA'] = df_cons_raw['PROVINCIA'].astype(str).str.upper().fillna("SIN DATO")
-        
-        # FILTRO POR PAÍS
+        # Normalización
+        for df in [df_afi_raw, df_cons_raw]:
+            df.columns = df.columns.str.upper()
+            df['LOCALIDAD'] = df['LOCALIDAD'].apply(rescatar_nombre_localidad)
+            df['PROVINCIA'] = df['PROVINCIA'].astype(str).str.upper().fillna("SIN DATO")
+
+        # Filtro de País en Consultorios
         if 'PAIS' in df_cons_raw.columns:
             df_cons_raw = df_cons_raw[df_cons_raw['PAIS'].astype(str).str.upper() == 'ARGENTINA']
-    except Exception as e:
-        st.error(f"Error en consultorios: {e}")
-        return None
 
-    cons_base = df_cons_raw.copy() # Base completa original
-    
-    # A. Deduplicación y limpieza
-    df_afi_clean = df_afi_raw.drop_duplicates(subset=['AFI_ID', 'CALLE', 'NUMERO'])
-    
-    LAT_MIN, LAT_MAX = -56.0, -21.0
-    LON_MIN, LON_MAX = -74.0, -53.0
+        # Deduplicación y Filtro Geográfico
+        df_afi_clean = df_afi_raw.drop_duplicates(subset=['AFI_ID', 'CALLE', 'NUMERO'])
+        
+        LAT_MIN, LAT_MAX = -56.0, -21.0
+        LON_MIN, LON_MAX = -74.0, -53.0
 
     def filtrar_geo(df):
         df['LATITUD'] = pd.to_numeric(df['LATITUD'], errors='coerce')
@@ -109,7 +275,7 @@ def cargar_y_procesar_datos():
         return df[mask].copy()
 
     df_mapa_afi = filtrar_geo(df_afi_clean)
-    df_mapa_cons = filtrar_geo(cons_base)
+    df_mapa_cons = filtrar_geo(df_cons_raw)
 
     # SEPARACIÓN LÓGICA (Dentro de cargar_y_procesar_datos)
     # Filtramos solo lo que NO es farmacia para cálculos médicos
@@ -532,5 +698,6 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
 
