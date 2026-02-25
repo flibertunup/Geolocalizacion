@@ -258,6 +258,8 @@ def cargar_y_procesar_datos():
         def filtrar_geo(df):
             df['LATITUD'] = pd.to_numeric(df['LATITUD'], errors='coerce')
             df['LONGITUD'] = pd.to_numeric(df['LONGITUD'], errors='coerce')
+            # 2. Eliminar filas donde falte alguna de las dos
+            df = df.dropna(subset=['LATITUD', 'LONGITUD'])
             mask = (df['LATITUD'].between(LAT_MIN, LAT_MAX)) & (df['LONGITUD'].between(LON_MIN, LON_MAX))
             return df[mask].copy()
     
@@ -461,14 +463,14 @@ try:
     res_afi = afi_filtrados.groupby(['LOCALIDAD', 'PROVINCIA']).agg(
         cant_afiliados=('AFI_ID', 'nunique'),
         dist_media=('distancia_km', 'mean'),
-        lat_ref=('LATITUD', 'mean'),
-        lon_ref=('LONGITUD', 'mean')
+        lat_ref=('LATITUD', 'median'),
+        lon_ref=('LONGITUD', 'median')
     ).reset_index()
 
     res_cons = cons_médicos.groupby(['LOCALIDAD', 'PROVINCIA']).agg(
         cant_consultorios=('LOCALIDAD', 'size'),
-        lat_cons=('LATITUD', 'mean'),
-        lon_cons=('LONGITUD', 'mean')
+        lat_cons=('LATITUD', 'median'),
+        lon_cons=('LONGITUD', 'median')
     ).reset_index()
 
     res_far = farmacias_f.groupby(['LOCALIDAD', 'PROVINCIA']).size().reset_index(name='cant_farmacias')
@@ -686,6 +688,7 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
 
 
