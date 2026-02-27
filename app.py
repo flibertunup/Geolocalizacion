@@ -681,7 +681,7 @@ try:
         # 2. Consultorios no encontrados
         # Comparamos por índice para ser precisos con los originales
         cons_en_mapa_idx = cons_geo_all.index
-        cons_no_encontrados = cons_base[~cons_base.index.isin(cons_en_mapa_idx)]
+        cons_no_encontrados = df_cons_raw[~df_cons_raw.index.isin(cons_en_mapa_idx)]
 
         with col2:
             st.write(f"**Consultorios no localizados:** {formato_miles(len(cons_no_encontrados))}")
@@ -696,6 +696,7 @@ try:
 except Exception as e:
 
       st.error(f"Error en la aplicación: {e}")
+
 
 
 
